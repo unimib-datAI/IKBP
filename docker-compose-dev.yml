@@ -1,0 +1,178 @@
+version: "3.3"
+services:
+
+  tint:
+    restart: $RESTART_POLICY
+    image: rpozzi/tint
+    # build:
+    #   context: tint
+    #   dockerfile: Dockerfile
+    ports:
+      - 127.0.0.1:8012:8012
+
+  postgres:
+    restart: $RESTART_POLICY
+    image: postgres:14
+    environment:
+      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+    volumes:
+      - ./postgres/data:/var/lib/postgresql/data
+      - "./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql"
+    ports:
+      - 127.0.0.1:5432:5432
+
+  mongo:
+    restart: $RESTART_POLICY
+    image: mongo:4.4.6 # mongo 5 requires cpu supports AVX
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: $MONGO_ROOT_PASSWORD
+      MONGO_INITDB_DATABASE: main
+      MONGO_INITDB_USERNAME: usr
+      MONGO_INITDB_PASSWORD: $MONGO_PASSWORD
+    ports:
+      - 127.0.0.1:27017:27017
+    volumes:
+      - ./mongo/data:/data/db
+      - ./mongo/initdb.d:/docker-entrypoint-initdb.d/
+
+  documents:
+    restart: $RESTART_POLICY
+    build: documents
+    ports:
+      - 127.0.0.1:30900:3001
+    environment:
+      PORT: 3001
+      ENABLE_AUTH: false
+      MONGO: mongodb://usr:$MONGO_PASSWORD@mongo:27017/main
+    volumes:
+      - ./documents/src:/app/src #DEV
+
+  biencoder:
+    restart: $RESTART_POLICY
+    #image: rpozzi/blink_biencoder
+    build:
+      context: ./biencoder
+      dockerfile: Dockerfile
+    volumes:
+      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - ./biencoder/main.py:/home/app/main.py #DEV
+      - ./biencoder/blink:/home/app/blink #DEV
+    ports:
+      - 127.0.0.1:30300:80
+    environment:
+      PYTHONPATH: /home/app
+      BIENCODER_MODEL: $BIENCODER_MODEL
+      BIENCODER_CONFIG: $BIENCODER_CONFIG
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [ gpu ]
+    command: sleep 3600 #DEV
+    # command: python main.py --host 0.0.0.0 --port 80 --biencoder_model $BIENCODER_MODEL --biencoder_config $BIENCODER_CONFIG
+
+  indexer:
+    restart: $RESTART_POLICY
+    # image: rpozzi/blink_indexer
+    build:
+        context: ./indexer
+        dockerfile: Dockerfile
+    volumes:
+      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - ./indexer/main.py:/home/app/main.py #DEV
+    environment:
+      INDEXER_INDEX: $INDEXER_INDEX
+      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+      INDEXER_VECTOR_SIZE: $INDEXER_VECTOR_SIZE
+      INDEXER_LANGUAGE: $INDEXER_LANGUAGE
+    ports:
+      - 127.0.0.1:30301:80
+    depends_on:
+      - postgres
+    command: sleep 3600
+    # command: python main.py --host 0.0.0.0 --port 80 --index $INDEXER_INDEX --postgres postgres://postgres:$POSTGRES_PASSWORD@postgres:5432/postgres --vector-size $INDEXER_VECTOR_SIZE --language $INDEXER_LANGUAGE
+
+  nilcluster:
+    restart: $RESTART_POLICY
+    #image: rpozzi/blink_nilcluster
+    build:
+        context: ./nilcluster
+        dockerfile: Dockerfile
+    volumes:
+      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - ./nilcluster/main.py:/home/app/main.py #DEV
+    ports:
+      - 127.0.0.1:30305:80
+    # command: python main.py --host 0.0.0.0 --port 80
+
+  nilpredictor:
+    restart: $RESTART_POLICY
+    #image: rpozzi/blink_nilpredictor
+    build:
+        context: ./nilpredictor
+        dockerfile: Dockerfile
+    volumes:
+      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - ./nilpredictor/main.py:/home/app/main.py #DEV
+    environment:
+      NILPREDICTOR_ARGS: $NILPREDICTOR_ARGS
+    ports:
+      - 127.0.0.1:30303:80
+    # command: python main.py --host 0.0.0.0 --port 80 $NILPREDICTOR_ARGS
+
+  pipeline:
+    restart: $RESTART_POLICY
+    build: pipelinehelper
+    ports:
+      - 127.0.0.1:30315:80
+      - 127.0.0.1:12340:1234
+    environment:
+      LOCAL_IP: $LOCAL_IP
+    volumes:
+      - ./pipelinehelper/main.py:/home/app/main.py #DEV
+    command: sleep 3600 #DEV
+    # command: python main.py --host 0.0.0.0 --port 80 --api-baseurl http://$LOCAL_IP #DEV
+
+    # not used
+    # recognition:
+    #   build:
+    #       context: ./recognition
+    #       dockerfile: Dockerfile
+    #   expose:
+    #     - 30303
+    #   ports:
+    #     - 30303:80
+    #   command: python -m microservices.nilpredictor --host 0.0.0.0 --port 80 --nil-bi-model output/feature_ablation_study_ita/max_leve_model.pickle --nil-bi-features 'max_bi,levenshtein'
+  spacyner:
+    restart: $RESTART_POLICY
+    build:
+        context: ./spacyner
+        dockerfile: Dockerfile
+        args:
+          SPACY_MODEL: $SPACY_MODEL
+    environment:
+      SPACY_MODEL: $SPACY_MODEL
+    ports:
+      - 30304:80
+    volumes:
+      - ./spacyner/main.py:/home/app/main.py #DEV
+    # command: python __main__.py --host 0.0.0.0 --port 80 --model $SPACY_MODEL --tint http://tint:8012/tint
+
+  caddy:
+    restart: $RESTART_POLICY
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./caddy/Caddyfile.d:/etc/caddy/Caddyfile.d
+      - ./caddy/pwdfile:/etc/caddy/pwdfile
+      - ./caddy/site:/srv
+      - ./caddy/data:/data
+      - ./caddy/config:/config
+    environment:
+      # fully qualified domain name
+      FQDN: "$FQDN"
+      LOCAL_IP: "$LOCAL_IP"

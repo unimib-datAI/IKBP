@@ -1,0 +1,29 @@
+{
+  "name": "documents",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/app.js",
+  "scripts": {
+    "dev": "nodemon --exec node_modules/.bin/babel-node ./src/app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "marcoripa96",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "express": "^4.18.0",
+    "mongoose": "^6.3.2",
+    "mongoose-paginate-v2": "^1.6.3",
+    "mongoose-sequence": "^5.3.1",
+    "morgan": "^1.10.0",
+    "zod": "^3.14.4",
+    "zod-express-middleware": "^1.4.0"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.17.6",
+    "@babel/core": "^7.17.9",
+    "@babel/node": "^7.16.8",
+    "@babel/preset-env": "^7.16.11",
+    "nodemon": "^2.0.15"
+  }
+}

@@ -1,0 +1,6 @@
+node_modules
+_files/*
+!_files/text.json
+!_files/text.txt
+.env
+.pnpm-store

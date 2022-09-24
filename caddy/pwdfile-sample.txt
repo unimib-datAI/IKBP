@@ -1,0 +1,4 @@
+# rename in pwdfile
+# to get the encoded has password run `sudo docker-compose exec caddy caddy hash-password`
+# after modifying this file restart caddy `sudo docker-compose restart caddy`
+username encoded_hash_password

@@ -1,0 +1,6 @@
+[submodule ".submodules/BLINK"]
+	path = .submodules/BLINK
+	url = git@github.com:UNIMIBInside/BLINK.git
+[submodule "giustizia-ui"]
+	path = giustizia-ui
+	url = https://github.com/marcoripa96/giustizia-ui
