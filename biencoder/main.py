@@ -26,8 +26,8 @@ def vector_decode(s, dtype=np.float32):
 class Mention(BaseModel):
     label = 'unknown'
     label_id = -1
-    context_left: str
-    context_right:str
+    context_left: List[str]
+    context_right: List[str]
     mention: str
     start_pos: Optional[int]
     end_pos: Optional[int]
