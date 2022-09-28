@@ -6,7 +6,6 @@ import numpy as np
 import base64
 from typing import List, Optional
 from blink.indexer.faiss_indexer import DenseFlatIndexer, DenseHNSWFlatIndexer
-import json
 import psycopg
 import os
 from gatenlp import Document
@@ -30,6 +29,25 @@ class _Index:
 #             candidates.append(_c)
 #             scores.append(_s)
 #         return scores, candidates
+class HttpIndexer:
+    def __init__(self, url, only_indexes=None):
+        self.url = url
+        self.only_indexes = only_indexes
+        self.type = 'http'
+        self.index = _Index(10) # dummy ntotal set to 10
+    def search_knn(self, encodings, top_k):
+        body = {
+            'encodings': encodings,
+            'top_k': top_k,
+            'only_indexes': self.only_indexes,
+        }
+        res = requests.post(self.url, json=body)
+        if res.ok:
+            return res.json()
+        else:
+            print('Http error url', self.url)
+            return None
+        
 
 def vector_encode(v):
     s = base64.b64encode(v).decode()
@@ -43,6 +61,7 @@ def vector_decode(s, dtype=np.float32):
 class Input(BaseModel):
     encodings: List[str]
     top_k: int
+    only_indexes: Optional[List[int]]
 
 class Idinput(BaseModel):
     id: int
@@ -193,98 +212,114 @@ async def id2info_api(idinput: Idinput):
 async def search_api(input_: Input):
     encodings = input_.encodings
     top_k = input_.top_k
-    return search(encodings, top_k)
+    only_indexes = input_.only_indexes
+    return search(encodings, top_k, only_indexes)
 
-def search(encodings, top_k):
+def search(encodings, top_k, only_indexes=None):
     encodings = np.array([vector_decode(e) for e in encodings])
     all_candidates_4_sample_n = []
     for i in range(len(encodings)):
         all_candidates_4_sample_n.append([])
     for index in indexes:
+        if only_indexes and index['indexid'] not in only_indexes:
+            # skipping index not in only_indexes
+            continue
         indexer = index['indexer']
-        if indexer.index.ntotal == 0:
-            scores = np.zeros((encodings.shape[0], top_k))
-            candidates = -np.ones((encodings.shape[0], top_k)).astype(int)
-        else:
-            scores, candidates = indexer.search_knn(encodings, top_k)
-        n = 0
-        candidate_ids = set([id for cs in candidates for id in cs])
+        if indexer.type != 'http':
+            if indexer.index.ntotal == 0:
+                scores = np.zeros((encodings.shape[0], top_k))
+                candidates = -np.ones((encodings.shape[0], top_k)).astype(int)
+            else:
+                scores, candidates = indexer.search_knn(encodings, top_k)
+            n = 0
+            candidate_ids = set([id for cs in candidates for id in cs])
 
-        try:
-            with dbconnection.cursor() as cur:
-                cur.execute("""
-                    SELECT
-                        id, title, wikipedia_id, type_, wikidata_qid, redirects_to
-                    FROM
-                        entities
-                    WHERE
-                        id in ({}) AND
-                        indexer = %s;
-                    """.format(','.join([str(int(id)) for id in candidate_ids])), (index['indexid'],))
-                id2info = cur.fetchall()
-        except BaseException as e:
-            print('SELECT query ERROR. Rolling back.')
-            dbconnection.rollback()
+            try:
+                with dbconnection.cursor() as cur:
+                    cur.execute("""
+                        SELECT
+                            id, title, wikipedia_id, type_, wikidata_qid, redirects_to
+                        FROM
+                            entities
+                        WHERE
+                            id in ({}) AND
+                            indexer = %s;
+                        """.format(','.join([str(int(id)) for id in candidate_ids])), (index['indexid'],))
+                    id2info = cur.fetchall()
+            except BaseException as e:
+                print('SELECT query ERROR. Rolling back.')
+                dbconnection.rollback()
 
-        id2info = dict(zip(map(lambda x:x[0], id2info), map(lambda x:x[1:], id2info)))
-        for _scores, _cands, _enc in zip(scores, candidates, encodings):
+            id2info = dict(zip(map(lambda x:x[0], id2info), map(lambda x:x[1:], id2info)))
+            for _scores, _cands, _enc in zip(scores, candidates, encodings):
 
-            # for each samples
-            for _score, _cand in zip(_scores, _cands):
-                raw_score = float(_score)
-                _cand = int(_cand)
-                if _cand == -1:
-                    # -1 means no other candidates found
-                    break
-                # # compute dot product always (and normalized dot product)
+                # for each samples
+                for _score, _cand in zip(_scores, _cands):
+                    raw_score = float(_score)
+                    _cand = int(_cand)
+                    if _cand == -1:
+                        # -1 means no other candidates found
+                        break
+                    # # compute dot product always (and normalized dot product)
 
-                if _cand not in id2info:
-                    # candidate removed from kb but not from index (requires to reconstruct the whole index)
+                    if _cand not in id2info:
+                        # candidate removed from kb but not from index (requires to reconstruct the whole index)
+                        all_candidates_4_sample_n[n].append({
+                            'raw_score': -1000.0,
+                            'id': _cand,
+                            'wikipedia_id': 0,
+                            'title': '',
+                            'url': '',
+                            'type_': '',
+                            'indexer': index['indexid'],
+                            'score': -1000.0,
+                            'norm_score': -1000.0,
+                            'dummy': 1
+                        })
+                        continue
+                    title, wikipedia_id, type_, wikidata_qid, redirects_to = id2info[_cand]
+
+                    if index['index_type'] == 'flat':
+                        embedding = indexer.index.reconstruct(_cand)
+                    elif index['index_type'] == 'hnsw':
+                        embedding = indexer.index.reconstruct(_cand)[:-1]
+                        _score = np.inner(_enc, embedding)
+                    # elif index['index_type'] == 'annoy':
+                    #     embedding = indexer._index.get_item_vector(_cand)
+                    elif index['index_type'] == 'http':
+                        # call another indexer instance
+                        pass
+                    else:
+                        raise Exception('Should not happen.')
+
+                    # normalized dot product
+                    _enc_norm = np.linalg.norm(_enc)
+                    _embedding_norm = np.linalg.norm(embedding)
+                    _norm_factor = max(_enc_norm, _embedding_norm)**2
+                    _norm_score = _score / _norm_factor
+
                     all_candidates_4_sample_n[n].append({
-                        'raw_score': -1000.0,
-                        'id': _cand,
-                        'wikipedia_id': 0,
-                        'title': '',
-                        'url': '',
-                        'type_': '',
-                        'indexer': index['indexid'],
-                        'score': -1000.0,
-                        'norm_score': -1000.0,
-                        'dummy': 1
-                    })
-                    continue
-                title, wikipedia_id, type_, wikidata_qid, redirects_to = id2info[_cand]
-
-                if index['index_type'] == 'flat':
-                    embedding = indexer.index.reconstruct(_cand)
-                elif index['index_type'] == 'hnsw':
-                    embedding = indexer.index.reconstruct(_cand)[:-1]
-                    _score = np.inner(_enc, embedding)
-                elif index['index_type'] == 'annoy':
-                    embedding = indexer._index.get_item_vector(_cand)
-                else:
-                    raise Exception('Should not happen.')
-
-                # normalized dot product
-                _enc_norm = np.linalg.norm(_enc)
-                _embedding_norm = np.linalg.norm(embedding)
-                _norm_factor = max(_enc_norm, _embedding_norm)**2
-                _norm_score = _score / _norm_factor
-
-                all_candidates_4_sample_n[n].append({
-                        'raw_score': raw_score,
-                        'id': _cand,
-                        'wikipedia_id': wikipedia_id,
-                        'wikidata_qid': wikidata_qid,
-                        'redirects_to': redirects_to,
-                        'title': title,
-                        'url': id2url(wikipedia_id),
-                        'type_': type_,
-                        'indexer': index['indexid'],
-                        'score': float(_score),
-                        'norm_score': float(_norm_score)
-                    })
-            n += 1
+                            'raw_score': raw_score,
+                            'id': _cand,
+                            'wikipedia_id': wikipedia_id,
+                            'wikidata_qid': wikidata_qid,
+                            'redirects_to': redirects_to,
+                            'title': title,
+                            'url': id2url(wikipedia_id),
+                            'type_': type_,
+                            'indexer': index['indexid'],
+                            'score': float(_score),
+                            'norm_score': float(_norm_score)
+                        })
+        
+                n += 1
+        else:
+            # indexer http
+            all_candidates_4_sample_n_http = indexer.search_knn(encodings, top_k)
+            if all_candidates_4_sample_n_http:
+                assert len(all_candidates_4_sample_n_http) == len(all_candidates_4_sample_n)
+                for i in range(len(all_candidates_4_sample_n)):
+                    all_candidates_4_sample_n[i].extend(all_candidates_4_sample_n_http[i])
     # sort
     for _sample in all_candidates_4_sample_n:
         _sample.sort(key=lambda x: x['score'], reverse=True)
@@ -406,6 +441,8 @@ def load_models(args):
                 indexer = DenseFlatIndexer(args.vector_size)
             elif index_type == "hnsw":
                 raise ValueError("Error! HNSW index File not Found! Cannot create a hnsw index from scratch.")
+            elif index_type == 'http':
+                indexer = HttpIndexer(index_path, [indexid])
             else:
                 raise ValueError("Error! Unsupported indexer type! Choose from flat,hnsw.")
         indexes.append({
