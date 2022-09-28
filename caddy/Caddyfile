@@ -1,33 +1,37 @@
 import /etc/caddy/Caddyfile.d/*
 
 (main) {
-	handle /api/blink/biencoder* {
+	handle {$BASE_PATH}/api/blink/biencoder* {
 		reverse_proxy biencoder:80
 	}
-	handle /api/indexer* {
+	handle {$BASE_PATH}/api/indexer* {
 		reverse_proxy indexer:80
 	}
-	handle /api/nilprediction* {
+	handle {$BASE_PATH}/api/nilprediction* {
 		reverse_proxy nilpredictor:80
 	}
-	handle /api/spacyner* {
+	handle {$BASE_PATH}/api/spacyner* {
 		reverse_proxy spacyner:80
 	}
-	handle /api/tintner* {
+	handle {$BASE_PATH}/api/tintner* {
 		reverse_proxy tintner:80
 	}
-	handle /api/nilcluster* {
+	handle {$BASE_PATH}/api/nilcluster* {
 		reverse_proxy nilcluster:80
 	}
-	handle /api/pipeline* {
+	handle {$BASE_PATH}/api/pipeline* {
 		reverse_proxy pipeline:80
 	}
-	handle_path /api/mongo/* {
+	handle_path {$BASE_PATH}/api/mongo/* {
 		rewrite * /api/{path}
 		reverse_proxy documents:3001
 	}
 
 	import /etc/caddy/Caddyfile.main.d/*
+
+	handle {$BASE_PATH} {
+		reverse_proxy ui:3000
+	}
 
 	respond "404 Not Found" 404
 
