@@ -9,22 +9,6 @@ import numpy as np
 import os
 from gatenlp import Document
 
-###
-spacyner = '/api/spacyner'
-tintner = '/api/tintner'
-biencoder = '/api/blink/biencoder' # mention # entity
-biencoder_mention = f'{biencoder}/mention/doc'
-biencoder_entity = f'{biencoder}/entity'
-crossencoder = '/api/blink/crossencoder'
-indexer = '/api/indexer' # search # add
-indexer_search = f'{indexer}/search/doc'
-indexer_add = f'{indexer}/add/doc'
-indexer_reset = f'{indexer}/reset/rw'
-nilpredictor = '/api/nilprediction/doc'
-nilcluster = '/api/nilcluster/doc'
-mongo = '/api/mongo/document'
-###
-
 app = FastAPI()
 
 @app.post('/api/pipeline')
@@ -122,14 +106,69 @@ if __name__ == '__main__':
     parser.add_argument(
         "--host", type=str, default="127.0.0.1", help="host to listen at",
     )
-
     parser.add_argument(
         "--port", type=int, default="30310", help="port to listen at",
     )
-
     parser.add_argument(
         "--api-baseurl", type=str, default=None, help="Baseurl to call all the APIs", dest='baseurl', required=True
     )
+    parser.add_argument(
+        "--api-spacyner", type=str, default=None, help="spacyner URL", dest='spacyner', required=False
+    )
+    parser.add_argument(
+        "--api-tintner", type=str, default=None, help="tintner URL", dest='tintner', required=False
+    )
+    parser.add_argument(
+        "--api-biencoder-mention", type=str, default=None, help="biencoder_mention URL", dest='biencoder_mention', required=False
+    )
+    parser.add_argument(
+        "--api-biencoder-entity", type=str, default=None, help="biencoder_entity URL", dest='biencoder_entity', required=False
+    )
+    parser.add_argument(
+        "--api-crossencoder", type=str, default=None, help="crossencoder URL", dest='crossencoder', required=False
+    )
+    parser.add_argument(
+        "--api-indexer-search", type=str, default=None, help="indexer_search URL", dest='indexer_search', required=False
+    )
+    parser.add_argument(
+        "--api-indexer-add", type=str, default=None, help="indexer_add URL", dest='indexer_add', required=False
+    )
+    parser.add_argument(
+        "--api-indexer-reset", type=str, default=None, help="indexer_reset URL", dest='indexer_reset', required=False
+    )
+    parser.add_argument(
+        "--api-nilpredictor", type=str, default=None, help="nilpredictor URL", dest='nilpredictor', required=False
+    )
+    parser.add_argument(
+        "--api-nilcluster", type=str, default=None, help="nilcluster URL", dest='nilcluster', required=False
+    )
+    parser.add_argument(
+        "--api-mongo", type=str, default=None, help="mongo URL", dest='mongo', required=False
+    )
+
     args = parser.parse_args()
+
+    if args.spacyner is None:
+        args.spacyner = args.baseurl + '/api/spacyner'
+    if args.tintner is None:
+        args.tintner = args.baseurl + '/api/tintner'
+    if args.biencoder_mention is None:
+        args.biencoder_mention = args.baseurl + '/api/blink/biencoder/mention/doc'
+    if args.biencoder_entity is None:
+        args.biencoder_entity = args.baseurl + '/api/blink/biencoder/entity'
+    if args.crossencoder is None:
+        args.crossencoder = args.baseurl + '/api/blink/crossencoder'
+    if args.indexer_search is None:
+        args.indexer_search = args.baseurl + '/api/indexer/search/doc'
+    if args.indexer_add is None:
+        args.indexer_add = args.baseurl + '/api/indexer/add/doc'
+    if args.indexer_reset is None:
+        args.indexer_reset = args.baseurl + '/api/indexer/reset/rw'
+    if args.nilpredictor is None:
+        args.nilpredictor = args.baseurl + '/api/nilprediction/doc'
+    if args.nilcluster is None:
+        args.nilcluster = args.baseurl + '/api/nilcluster/doc'
+    if args.mongo is None:
+        args.mongo = args.baseurl + '/api/mongo/document'
 
     uvicorn.run(app, host = args.host, port = args.port)
