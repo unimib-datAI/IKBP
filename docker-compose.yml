@@ -173,7 +173,18 @@ services:
       LOCAL_IP: "$LOCAL_IP"
 
   ui:
-    build: giustizia-ui
+    build:
+      context: giustizia-ui
+      args:
+        ACCESS_USERNAME: $UI_ACCESS_USERNAME
+        ACCESS_PASSWORD: $UI_ACCESS_PASSWORD
+        API_BASE_URI: ${PIPELINE_ADDRESS}/api
+        API_USERNAME: ""
+        API_PASSWORD: ""
+        NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
+        NEXTAUTH_URL: $UI_NEXTAUTH_URL
+        NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
+        NEXT_PUBLIC_FULL_PATH: $UI_NEXT_PUBLIC_FULL_PATH
     ports:
       - $LISTEN_UI:3000
     environment:
