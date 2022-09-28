@@ -175,7 +175,7 @@ services:
   ui:
     build: giustizia-ui
     ports:
-      - 127.0.0.1:8080:3000
+      - $LISTEN_UI:3000
     environment:
       ACCESS_USERNAME: $UI_ACCESS_USERNAME
       ACCESS_PASSWORD: $UI_ACCESS_PASSWORD
