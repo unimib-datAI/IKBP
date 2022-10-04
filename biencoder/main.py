@@ -28,6 +28,9 @@ class Mention(BaseModel):
     label_id = -1
     context_left: str
     context_right:str
+    header: str
+    header_left: List[str]
+    header_right: List[str]
     mention: str
     start_pos: Optional[int]
     end_pos: Optional[int]
