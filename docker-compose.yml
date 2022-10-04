@@ -19,7 +19,9 @@ services:
       context: ./biencoder
       dockerfile: Dockerfile
     volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - ./biencoder/main.py:/home/app/main.py
+      - .submodules/BLINK/blink:/home/app/blink
+      - /home/mmarzocchi/train_blink/train_blink/models:/home/app/models
     ports:
       - $LISTEN_BIENCODER:80
     environment:
@@ -40,7 +42,8 @@ services:
         context: ./indexer
         dockerfile: Dockerfile
     volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - .submodules/BLINK/blink:/home/app/blink
+      - /mnt/mmarzocchi/indexes:/home/app/models
     environment:
       INDEXER_INDEX: $INDEXER_INDEX
       POSTGRES_PASSWORD: $POSTGRES_PASSWORD
