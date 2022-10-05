@@ -10,7 +10,7 @@ import mongoose, { Schema } from 'mongoose';
 
 const annotationSchema = new Schema({
   annotationSetId: mongoose.Types.ObjectId,
-  id: String,
+  id: Number,
   type: String,
   start: Number,
   end: Number,
