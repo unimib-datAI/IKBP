@@ -29,7 +29,7 @@ import /etc/caddy/Caddyfile.d/*
 
 	import /etc/caddy/Caddyfile.main.d/*
 
-	handle {$BASE_PATH} {
+	handle {$BASE_PATH}* {
 		reverse_proxy ui:3000
 	}
 
