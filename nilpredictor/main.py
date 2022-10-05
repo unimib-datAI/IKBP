@@ -41,6 +41,13 @@ app = FastAPI()
 
 @app.post('/api/nilprediction/doc')
 async def nilprediction_doc_api(doc: dict = Body(...)):
+    return nilprediction_doc(10, doc)
+
+@app.post('/api/nilprediction/doc/{top_k}')
+async def nilprediction_doc_api(top_k: int, doc: dict = Body(...)):
+    return nil_prediction_doc(top_k, doc)
+
+def nilprediction_doc(top_k: int, doc: dict = Body(...)):
     doc = Document.from_dict(doc)
 
     input = []
@@ -54,22 +61,24 @@ async def nilprediction_doc_api(doc: dict = Body(...)):
             if 'linking' in mention.features and mention.features['linking'].get('skip', False):
                 # DATES should skip = true bcs linking useless
                 continue
-            gt_features = mention.features['linking']['top_candidate']
-            feat = Features()
-            if 'score' in gt_features:
-                if 'score_bi' in gt_features:
-                    # bi
-                    feat.max_bi = gt_features['score_bi']
-                    # cross
-                    feat.max_cross = gt_features['score']
-                else:
-                    # bi only
-                    feat.max_bi = gt_features['score']
-            feat.mention = mention.features['mention'] if 'mention' in mention.features \
-                                                        else doc.text[mention.start:mention.end]
-            feat.title = gt_features['title'] if 'title' in gt_features else None
+            candidates = mention.features['linking']['candidates'][:top_k]
+            assert len(candidates) == top_k
+            for gt_features in candidates:
+                feat = Features()
+                if 'score' in gt_features:
+                    if 'score_bi' in gt_features:
+                        # bi
+                        feat.max_bi = gt_features['score_bi']
+                        # cross
+                        feat.max_cross = gt_features['score']
+                    else:
+                        # bi only
+                        feat.max_bi = gt_features['score']
+                feat.mention = mention.features['mention'] if 'mention' in mention.features \
+                                                            else doc.text[mention.start:mention.end]
+                feat.title = gt_features['title'] if 'title' in gt_features else None
 
-            input.append(feat)
+                input.append(feat)
             mentions.append(mention)
 
     nil_results = run(input)
@@ -77,15 +86,26 @@ async def nilprediction_doc_api(doc: dict = Body(...)):
     score_label = 'nil_score_cross' if 'nil_score_cross' in nil_results else 'nil_score_bi'
     add_score_bi = 'nil_score_cross' in nil_results
 
+    # for each candidate add a NIL score, then re-rank according to nil score #TODO
     for i, mention in enumerate(mentions):
-        mention.features['linking']['nil_score'] = nil_results[score_label][i]
-        mention.features['linking']['is_nil'] = bool(nil_results[score_label][i] < args.threshold)
-        if add_score_bi:
-            mention.features['linking']['nil_score_bi'] = nil_results[score_label][i]
+        # truncate candidates to top_k
+        mention.features['linking']['candidates'] = mention.features['linking']['candidates'][:top_k]
+        for c in range(top_k):
+            mention.features['linking']['candidates'][c]['nil_score'] = nil_results[score_label][i+c]
+            mention.features['linking']['candidates'][c]['is_nil'] = bool(nil_results[score_label][i+c] < args.threshold)
+
+            if add_score_bi:
+                mention.features['linking']['candidates'][c]['nil_score_bi'] = nil_results[score_label][i+c]
+
+        # sort candidates according to nil score
+        mention.features['linking']['candidates'].sort(reverse=True, key=lambda x: x['nil_score'])
+        # set top candidate
+        mention.features['linking']['top_candidate'] = mention.features['linking']['candidates'][0]
 
     if not 'pipeline' in doc.features:
         doc.features['pipeline'] = []
     doc.features['pipeline'].append('nilprediction')
+
 
     return doc.to_dict()
 
