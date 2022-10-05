@@ -1,4 +1,5 @@
-pwdfile
+pwdfile.d
+auth.d
 config
 data
 site
