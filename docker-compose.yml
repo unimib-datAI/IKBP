@@ -170,6 +170,7 @@ services:
       - ./caddy/config:/config
     environment:
       # fully qualified domain name
+      BASE_PATH: "$CADDY_BASE_PATH"
       FQDN: "$FQDN"
       LOCAL_IP: "$LOCAL_IP"
 
