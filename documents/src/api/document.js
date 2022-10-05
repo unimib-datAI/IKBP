@@ -56,6 +56,10 @@ export default (app) => {
           if (!('mention' in annot.features)) {
             annot.features.mention = document.text.substring(annot.start, annot.end);
           }
+          // workaround for issue 1 // TODO remove
+          if (typeof annot.id === 'string' || annot.id instanceof String) {
+            annot.id = parseInt(annot.id);
+          }
         }
       }
 
