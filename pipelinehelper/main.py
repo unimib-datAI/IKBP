@@ -58,6 +58,19 @@ async def run(doc: dict = Body(...)):
             raise Exception('NIL prediction error')
         doc = Document.from_dict(res_nilprediction.json())
 
+    # if top_candidate is not NIL, then set its type as NER type #TODO study if ner is the correct place for the type
+    for annset_name in doc.annset_names():
+        if not annset_name.startswith('entities'):
+            # considering only annotation sets of entities
+            continue
+        for annotation in doc.annset(annset_name):
+            if annotation.features['linking']['top_candidate']['type']:
+                if not annotation.features['types']:
+                    annotation.features['types'] = []
+                annotation.features['types'].append(annotation.features['linking']['top_candidate']['type'])
+                annotation.anntype = annotation.features['linking']['top_candidate']['type']
+    # TODO ensure consistency between types
+
     if 'nilclustering' in doc.features['pipeline']:
         print('Skipping nilclustering: already done')
     else:
