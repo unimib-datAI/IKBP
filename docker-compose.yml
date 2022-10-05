@@ -163,7 +163,8 @@ services:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile
       - ./caddy/Caddyfile.d:/etc/caddy/Caddyfile.d
       - ./caddy/Caddyfile.main.d:/etc/caddy/Caddyfile.main.d
-      - ./caddy/pwdfile:/etc/caddy/pwdfile
+      - ./caddy/pwdfile.d:/etc/caddy/pwdfile.d
+      - ./caddy/auth.d:/etc/caddy/auth.d
       - ./caddy/site:/srv
       - ./caddy/data:/data
       - ./caddy/config:/config

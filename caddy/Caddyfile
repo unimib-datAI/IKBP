@@ -42,9 +42,7 @@ http://{$LOCAL_IP} {
 }
 
 {$FQDN} {
-	basicauth {
-		import /etc/caddy/pwdfile
-	}
+	import /etc/caddy/auth.d/*
 	import main
 }
 
