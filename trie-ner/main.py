@@ -5,20 +5,29 @@ from pydantic import BaseModel
 from TrieNER import TrieNER
 from typing import List, Optional, Dict
 from pathlib import Path
+from datetime import datetime
+import uuid
 
 app = FastAPI()
 
-@app.get('/api/trie-ner')
-# async def run(doc: dict = Body(...)):
-async def run():
-    p = Path(args.path_to_saved_tries) / args.trie_name
+ANN_SET_NAME = 'entities_trie_ner_v1.0.0'
 
-    # doc = Document.from_dict(doc)
+@app.post('/api/trie-ner')
+async def run(doc: dict = Body(...)):
+  path_to_trie = Path(args.path_to_saved_tries) / args.trie_name
 
-    trie = TrieNER(p)
+  tner = TrieNER(path_to_trie)
+  annotations = tner.find_matches(doc['text'])
 
-    return trie.get_entities()
+  ann_set = {
+    'name': ANN_SET_NAME,
+    'next_annid': len(annotations) + 1,
+    'annotations': annotations
+  }
 
+  doc['annotation_sets'][ANN_SET_NAME] = ann_set
+
+  return doc
 
 
 if __name__ == '__main__':
