@@ -1,48 +1,32 @@
-import /etc/caddy/Caddyfile.d/*
+{
+auto_https off
+}
 
-(main) {
-	handle {$BASE_PATH}/api/blink/biencoder* {
+http:// {
+	handle /api/blink/biencoder* {
 		reverse_proxy biencoder:80
 	}
-	handle {$BASE_PATH}/api/indexer* {
+	handle /api/indexer* {
 		reverse_proxy indexer:80
 	}
-	handle {$BASE_PATH}/api/nilprediction* {
+	handle /api/nilprediction* {
 		reverse_proxy nilpredictor:80
 	}
-	handle {$BASE_PATH}/api/spacyner* {
+	handle /api/spacyner* {
 		reverse_proxy spacyner:80
 	}
-	handle {$BASE_PATH}/api/tintner* {
+	handle /api/tintner* {
 		reverse_proxy tintner:80
 	}
-	handle {$BASE_PATH}/api/nilcluster* {
+	handle /api/nilcluster* {
 		reverse_proxy nilcluster:80
 	}
-	handle {$BASE_PATH}/api/pipeline* {
+	handle /api/pipeline* {
 		reverse_proxy pipeline:80
 	}
-	handle_path {$BASE_PATH}/api/mongo/* {
+	handle_path /api/mongo/* {
 		rewrite * /api/{path}
 		reverse_proxy documents:3001
 	}
-
-	import /etc/caddy/Caddyfile.main.d/*
-
-	handle {$BASE_PATH}* {
-		reverse_proxy ui:3000
-	}
-
 	respond "404 Not Found" 404
-
 }
-
-http://{$LOCAL_IP} {
-	import main
-}
-
-{$FQDN} {
-	import /etc/caddy/auth.d/*
-	import main
-}
-

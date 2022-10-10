@@ -1,3 +1,0 @@
-#basicauth {
-#        import /etc/caddy/pwdfile.d/pwdfile
-#}
