@@ -64,11 +64,15 @@ async def run(doc: dict = Body(...)):
             # considering only annotation sets of entities
             continue
         for annotation in doc.annset(annset_name):
-            if annotation.features['linking']['top_candidate']['type']:
-                if not annotation.features['types']:
-                    annotation.features['types'] = []
-                annotation.features['types'].append(annotation.features['linking']['top_candidate']['type'])
-                annotation.anntype = annotation.features['linking']['top_candidate']['type']
+            if annotation.features['linking'].get('skip'):
+                continue
+            if annotation.features['linking']['top_candidate'].get('type_'):
+                # TODO check hierarchy or combine as a different annotation
+                if annotation.type != annotation.features['linking']['top_candidate']['type_']:
+                    if not annotation.features.get('types'):
+                        annotation.features['types'] = []
+                    annotation.features['types'].append(annotation.type)
+                    annotation._type = annotation.features['linking']['top_candidate']['type_']
     # TODO ensure consistency between types
 
     if 'nilclustering' in doc.features['pipeline']:
