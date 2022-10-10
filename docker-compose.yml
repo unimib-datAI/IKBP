@@ -158,19 +158,11 @@ services:
     image: caddy:2
     ports:
       - "$CADDY_LISTEN_HTTP:80"
-      - "$CADDY_LISTEN_HTTPS:443"
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile
-      - ./caddy/Caddyfile.d:/etc/caddy/Caddyfile.d
-      - ./caddy/Caddyfile.main.d:/etc/caddy/Caddyfile.main.d
-      - ./caddy/pwdfile:/etc/caddy/pwdfile
       - ./caddy/site:/srv
       - ./caddy/data:/data
       - ./caddy/config:/config
-    environment:
-      # fully qualified domain name
-      FQDN: "$FQDN"
-      LOCAL_IP: "$LOCAL_IP"
 
   ui:
     build:
