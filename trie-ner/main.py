@@ -6,7 +6,6 @@ from TrieNER import TrieNER
 from typing import List, Optional, Dict
 from pathlib import Path
 from datetime import datetime
-import uuid
 
 app = FastAPI()
 
