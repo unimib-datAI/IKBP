@@ -100,16 +100,6 @@ services:
     environment:
       PIPELINE_ADDRESS: $PIPELINE_ADDRESS
 
-    # not used
-    # recognition:
-    #   build:
-    #       context: ./recognition
-    #       dockerfile: Dockerfile
-    #   expose:
-    #     - 30303
-    #   ports:
-    #     - 30303:80
-    #   command: python -m microservices.nilpredictor --host 0.0.0.0 --port 80 --nil-bi-model output/feature_ablation_study_ita/max_leve_model.pickle --nil-bi-features 'max_bi,levenshtein'
   spacyner:
     restart: $RESTART_POLICY
     build: ./spacyner

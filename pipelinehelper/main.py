@@ -21,7 +21,7 @@ async def run(doc: dict = Body(...)):
     if 'spacyner' in doc.features['pipeline']:
         print('Skipping spacyner: already done')
     else:
-        res_ner = requests.post(args.baseurl + args.spacyner, json=doc.to_dict())
+        res_ner = requests.post(args.spacyner, json=doc.to_dict())
         if not res_ner.ok:
             raise Exception('spacyNER error')
         doc = Document.from_dict(res_ner.json())
@@ -29,7 +29,7 @@ async def run(doc: dict = Body(...)):
     if 'tintner' in doc.features['pipeline']:
         print('Skipping tintner: already done')
     else:
-        res_ner = requests.post(args.baseurl + args.tintner, json=doc.to_dict())
+        res_ner = requests.post(args.tintner, json=doc.to_dict())
         if not res_ner.ok:
             raise Exception('tintNER error')
         doc = Document.from_dict(res_ner.json())
@@ -37,7 +37,7 @@ async def run(doc: dict = Body(...)):
     if 'biencoder' in doc.features['pipeline']:
         print('Skipping biencoder: already done')
     else:
-        res_biencoder = requests.post(args.baseurl + args.biencoder_mention, json=doc.to_dict())
+        res_biencoder = requests.post(args.biencoder_mention, json=doc.to_dict())
         if not res_biencoder.ok:
             raise Exception('Biencoder errror')
         doc = Document.from_dict(res_biencoder.json())
@@ -45,7 +45,7 @@ async def run(doc: dict = Body(...)):
     if 'indexer' in doc.features['pipeline']:
         print('Skipping indexer: already done')
     else:
-        res_indexer = requests.post(args.baseurl + args.indexer_search, json=doc.to_dict())
+        res_indexer = requests.post(args.indexer_search, json=doc.to_dict())
         if not res_indexer.ok:
             raise Exception('Indexer error')
         doc = Document.from_dict(res_indexer.json())
@@ -53,7 +53,7 @@ async def run(doc: dict = Body(...)):
     if 'nilprediction' in doc.features['pipeline']:
         print('Skipping nilprediction: already done')
     else:
-        res_nilprediction = requests.post(args.baseurl + args.nilpredictor, json=doc.to_dict())
+        res_nilprediction = requests.post(args.nilpredictor, json=doc.to_dict())
         if not res_nilprediction.ok:
             raise Exception('NIL prediction error')
         doc = Document.from_dict(res_nilprediction.json())
@@ -74,14 +74,14 @@ async def run(doc: dict = Body(...)):
     if 'nilclustering' in doc.features['pipeline']:
         print('Skipping nilclustering: already done')
     else:
-        res_clustering = requests.post(args.baseurl + args.nilcluster, json=doc.to_dict())
+        res_clustering = requests.post(args.nilcluster, json=doc.to_dict())
         if not res_clustering.ok:
             raise Exception('Clustering error')
         doc = Document.from_dict(res_clustering.json())
 
     if doc.features.get('populate', False):
         # get clusters
-        res_populate = requests.post(args.baseurl + args.indexer_add, json=doc.to_dict())
+        res_populate = requests.post(args.indexer_add, json=doc.to_dict())
         if not res_populate.ok:
             raise Exception('Population error')
         doc = Document.from_dict(res_populate.json())
@@ -94,7 +94,7 @@ async def run(doc: dict = Body(...)):
                 if 'features' in anno and 'linking' in anno['features'] \
                         and 'encoding' in anno['features']['linking']:
                     del anno['features']['linking']['encoding']
-        res_save = requests.post(args.baseurl + args.mongo, json=dict_to_save)
+        res_save = requests.post(args.mongo, json=dict_to_save)
         if not res_save.ok:
             raise Exception('Save error')
 
