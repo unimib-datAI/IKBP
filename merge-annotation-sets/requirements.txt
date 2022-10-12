@@ -1,0 +1,8 @@
+pandas
+numpy
+uvicorn
+fastapi
+requests
+gatenlp
+marisa-trie
+tqdm
