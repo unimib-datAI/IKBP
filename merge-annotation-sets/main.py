@@ -14,12 +14,6 @@ app = FastAPI()
 MAXIMUM_PER_PARTS = 6
 MAXIMUM_PARTS = 10
 
-annset_priority = {
-  'entities_trie_ner_v1.0.0': 100,
-  'entities_spacy_it_trf_v1.0.0': 10,
-  'entities_aplha_v0.1.0_tint': 10
-}
-
 def get_annset_exclusion_list(doc, annset_priority):
   exclusion_list = []
   for annset_key in doc['annotation_sets']:
@@ -27,18 +21,23 @@ def get_annset_exclusion_list(doc, annset_priority):
       exclusion_list.append(annset_key)
   return exclusion_list
 
+def get_annset_priority(doc, annset_priority):
+  if annset_priority is None:
+    annset_priority = dict()
+    for annset_key in doc['annotation_sets']:
+      annset_priority[annset_key] = 1
+  return annset_priority
 
 class Body(BaseModel):
     doc: dict
     merged_name: str
-    annset_priority: dict = annset_priority
-
+    annset_priority: dict = None
 
 @app.post('/api/merge-sets')
 async def run(body: Body):
   doc = body.doc
   merged_name = body.merged_name
-  annset_priority = body.annset_priority
+  annset_priority = get_annset_priority(doc, body.annset_priority)
   exclusion_list = get_annset_exclusion_list(doc, annset_priority)
   doc = Document.from_dict(doc)
   type_relation_df = pd.read_csv(args.path_to_type_relation_csv)
