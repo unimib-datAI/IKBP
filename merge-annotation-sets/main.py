@@ -8,6 +8,7 @@ from pathlib import Path
 from datetime import datetime
 from gatenlp import Document
 from merge_sets import create_best_NER_annset
+import json
 
 app = FastAPI()
 
@@ -28,13 +29,22 @@ def get_annset_priority(doc, annset_priority):
       annset_priority[annset_key] = 1
   return annset_priority
 
-class Body(BaseModel):
+class Input(BaseModel):
     doc: dict
     merged_name: str
     annset_priority: dict = None
 
+@app.post('/api/mergesets/doc')
+async def run_api_doc(doc: dict = Body(...)):
+    body = Input(doc=doc, merged_name='entities_merged', annset_priority=annset_priority_g)
+    return run(body)
+    
+
 @app.post('/api/mergesets')
-async def run(body: Body):
+async def run_api(body: Input):
+    return run(body)
+
+def run(body: Input):
   doc = body.doc
   merged_name = body.merged_name
   annset_priority = get_annset_priority(doc, body.annset_priority)
@@ -60,10 +70,19 @@ if __name__ == '__main__':
     parser.add_argument(
         "--path-to-type-relation-csv", type=str, default=None, dest='path_to_type_relation_csv', help="Path to type realtion csv",
     )
+    parser.add_argument(
+        "--path-to-annset-priotity", type=str, default=None, dest='path_to_annset_priotity', help="Path to annset priotity (JSON list of wildcards)",
+    )
 
     args = parser.parse_args()
 
     if args.path_to_type_relation_csv is None:
         args.path_to_type_relation_csv = './data/type_relation_df.csv'
+
+    if args.path_to_annset_priotity:
+        with open(args.path_to_annset_priotity, 'r') as fd:
+            annset_priority_g = json.load(fd)
+    else:
+        annset_priority_g = None
 
     uvicorn.run(app, host = args.host, port = args.port)

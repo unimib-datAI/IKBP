@@ -13,9 +13,6 @@ ANN_SET_NAME = 'entities_trie_ner_v1.0.0'
 
 @app.post('/api/triener')
 async def run(doc: dict = Body(...)):
-  path_to_trie = Path(args.path_to_saved_tries) / args.trie_name
-
-  tner = TrieNER(path_to_trie)
   annotations = tner.find_matches(doc['text'])
 
   ann_set = {
@@ -51,5 +48,8 @@ if __name__ == '__main__':
         args.path_to_saved_tries = './'
     if args.trie_name is None:
         args.trie_name = 'kb'
+
+    path_to_trie = Path(args.path_to_saved_tries) / args.trie_name
+    tner = TrieNER(path_to_trie)
 
     uvicorn.run(app, host = args.host, port = args.port)

@@ -152,6 +152,12 @@ if __name__ == '__main__':
         "--api-tintner", type=str, default=None, help="tintner URL", dest='tintner', required=False
     )
     parser.add_argument(
+        "--api-triener", type=str, default=None, help="triener URL", dest='triener', required=False
+    )
+    parser.add_argument(
+        "--api-mergener", type=str, default=None, help="mergener URL", dest='mergener', required=False
+    )
+    parser.add_argument(
         "--api-biencoder-mention", type=str, default=None, help="biencoder_mention URL", dest='biencoder_mention', required=False
     )
     parser.add_argument(
@@ -188,7 +194,7 @@ if __name__ == '__main__':
     if args.triener is None:
         args.triener = args.baseurl + '/api/triener'
     if args.mergener is None:
-        args.mergener = args.baseurl + '/api/mergener'
+        args.mergener = args.baseurl + '/api/mergesets/doc'
     if args.biencoder_mention is None:
         args.biencoder_mention = args.baseurl + '/api/blink/biencoder/mention/doc'
     if args.biencoder_entity is None:
