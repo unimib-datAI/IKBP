@@ -34,6 +34,22 @@ async def run(doc: dict = Body(...)):
             raise Exception('tintNER error')
         doc = Document.from_dict(res_ner.json())
 
+    if 'triener' in doc.features['pipeline']:
+        print('Skipping triener: already done')
+    else:
+        res_ner = requests.post(args.triener, json=doc.to_dict())
+        if not res_ner.ok:
+            raise Exception('trieNER error')
+        doc = Document.from_dict(res_ner.json())
+
+    if 'mergener' in doc.features['pipeline']:
+        print('Skipping mergener: already done')
+    else:
+        res_ner = requests.post(args.mergener, json=doc.to_dict())
+        if not res_ner.ok:
+            raise Exception('mergeNER error')
+        doc = Document.from_dict(res_ner.json())
+
     if 'biencoder' in doc.features['pipeline']:
         print('Skipping biencoder: already done')
     else:
@@ -169,6 +185,10 @@ if __name__ == '__main__':
         args.spacyner = args.baseurl + '/api/spacyner'
     if args.tintner is None:
         args.tintner = args.baseurl + '/api/tintner'
+    if args.triener is None:
+        args.triener = args.baseurl + '/api/triener'
+    if args.mergener is None:
+        args.mergener = args.baseurl + '/api/mergener'
     if args.biencoder_mention is None:
         args.biencoder_mention = args.baseurl + '/api/blink/biencoder/mention/doc'
     if args.biencoder_entity is None:
