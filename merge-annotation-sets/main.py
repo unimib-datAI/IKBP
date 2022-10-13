@@ -33,7 +33,7 @@ class Body(BaseModel):
     merged_name: str
     annset_priority: dict = None
 
-@app.post('/api/merge-sets')
+@app.post('/api/mergesets')
 async def run(body: Body):
   doc = body.doc
   merged_name = body.merged_name
@@ -58,7 +58,7 @@ if __name__ == '__main__':
         "--port", type=int, default="30310", help="port to listen at",
     )
     parser.add_argument(
-        "--path-to-type-relation-csv", type=int, default=None, dest='path_to_type_relation_csv', help="Path to type realtion csv",
+        "--path-to-type-relation-csv", type=str, default=None, dest='path_to_type_relation_csv', help="Path to type realtion csv",
     )
 
     args = parser.parse_args()

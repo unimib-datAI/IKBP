@@ -94,6 +94,27 @@ services:
       NILPREDICTOR_ARGS: $NILPREDICTOR_ARGS
     # command: python main.py --host 0.0.0.0 --port 80 $NILPREDICTOR_ARGS
 
+  triener:
+    restart: $RESTART_POLICY
+    build:
+        context: ./trie-ner
+        dockerfile: Dockerfile
+    volumes:
+      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+    environment:
+      TRIE_NAME: kb
+      PATH_TO_SAVED_TRIES: /home/app/models/triener
+
+  mergener:
+    restart: $RESTART_POLICY
+    build:
+        context: ./merge-annotation-sets
+        dockerfile: Dockerfile
+    volumes:
+      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+    environment:
+      PATH_TO_TYPE_RELATION_CSV: /home/app/models/mergener/type_relation_df.csv
+
   pipeline:
     restart: $RESTART_POLICY
     build: pipelinehelper

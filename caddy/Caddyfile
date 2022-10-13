@@ -24,6 +24,12 @@ http:// {
 	handle /api/pipeline* {
 		reverse_proxy pipeline:80
 	}
+	handle /api/triener* {
+		reverse_proxy triener:80
+	}
+	handle /api/mergesets* {
+		reverse_proxy mergener:80
+	}
 	handle_path /api/mongo/* {
 		rewrite * /api/{path}
 		reverse_proxy documents:3001

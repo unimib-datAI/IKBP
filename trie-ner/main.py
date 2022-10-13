@@ -11,7 +11,7 @@ app = FastAPI()
 
 ANN_SET_NAME = 'entities_trie_ner_v1.0.0'
 
-@app.post('/api/trie-ner')
+@app.post('/api/triener')
 async def run(doc: dict = Body(...)):
   path_to_trie = Path(args.path_to_saved_tries) / args.trie_name
 
@@ -39,7 +39,7 @@ if __name__ == '__main__':
         "--port", type=int, default="30310", help="port to listen at",
     )
     parser.add_argument(
-        "--path-to-saved-tries", type=int, default=None, dest='path_to_saved_tries', help="Base path to saved tries",
+        "--path-to-saved-tries", type=str, default=None, dest='path_to_saved_tries', help="Base path to saved tries",
     )
     parser.add_argument(
         "--trie-name", type=str, default=None, dest='trie_name', help="Name of the trie to use"
