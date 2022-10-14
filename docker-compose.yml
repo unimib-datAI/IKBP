@@ -153,6 +153,7 @@ services:
       - ./caddy/config:/config
 
   ui:
+    restart: $RESTART_POLICY
     build:
       context: giustizia-ui
       args:
