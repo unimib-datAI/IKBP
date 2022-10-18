@@ -424,7 +424,7 @@ def add(items: List[Item]):
 def load_models(args):
     assert args.index is not None, 'Error! Index is required.'
     for index in args.index.split(','):
-        index_type, index_path, indexid, rorw = index.split(':')
+        index_type, index_path, indexid, rorw = index.split('+')
         print('Loading {} index from {}, mode: {}...'.format(index_type, index_path, rorw))
         if os.path.isfile(index_path):
             if index_type == "flat":
