@@ -119,7 +119,7 @@ services:
     restart: $RESTART_POLICY
     build: pipelinehelper
     environment:
-      PIPELINE_ADDRESS: $PIPELINE_ADDRESS
+      PIPELINE_ARGS: $PIPELINE_ARGS
 
   spacyner:
     restart: $RESTART_POLICY

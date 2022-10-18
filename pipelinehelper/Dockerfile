@@ -12,4 +12,4 @@ COPY . .
 
 RUN pip install --no-cache-dir --upgrade -r /home/app/requirements.txt
 
-CMD python main.py --host 0.0.0.0 --port 80 --api-baseurl $PIPELINE_ADDRESS
+CMD python main.py --host 0.0.0.0 --port 80 $PIPELINE_ARGS
