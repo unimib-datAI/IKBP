@@ -102,8 +102,8 @@ services:
     volumes:
       - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
     environment:
-      TRIE_NAME: kb
-      PATH_TO_SAVED_TRIES: /home/app/models/triener
+      TRIE_NAME: $TRIE_NAME
+      PATH_TO_SAVED_TRIES: $PATH_TO_SAVED_TRIES
 
   mergener:
     restart: $RESTART_POLICY
