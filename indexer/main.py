@@ -30,7 +30,10 @@ class _Index:
 #             scores.append(_s)
 #         return scores, candidates
 class HttpIndexer:
+    # pass the index as http:example.com:13:r (omit http:// from the url)
     def __init__(self, url, only_indexes=None):
+        if not url.startswith('http://'):
+            url = 'http://' + url
         self.url = url
         self.only_indexes = only_indexes
         self.type = 'http'
