@@ -45,12 +45,16 @@ class HttpIndexer:
             'top_k': top_k,
             'only_indexes': self.only_indexes,
         }
-        res = requests.post(self.url, json=body)
+        res = requests.post(self.url + '/api/indexer/search', json=body)
         if res.ok:
             return res.json()
         else:
             print('Http error url', self.url)
             return None
+    def id2info(self, body):
+        body = dict(body)
+        res = requests.post(self.url + '/api/indexer/info', json=body)
+        return res.json()
         
 
 def vector_encode(v):
@@ -71,7 +75,7 @@ class Idinput(BaseModel):
     id: int
     indexer: int
 
-indexes = []
+indexes = {}
 rw_index = None
 
 def id2url(wikipedia_id):
@@ -183,34 +187,37 @@ async def id2info_api(idinput: Idinput):
     ouput: (id, indexer) -> info
     TODO continue
     """
-    if not idinput.indexer in [i['indexid'] for i in indexes]:
+    if not idinput.indexer in indexes:
         raise HTTPException(status_code=400, detail="Unknown indexer id.")
 
-    with dbconnection.cursor() as cur:
-        cur.execute("""
-            SELECT
-                id, indexer, title, wikipedia_id, type_, wikidata_qid, redirects_to, descr
-            FROM
-                entities
-            WHERE
-                id = %s AND
-                indexer = %s;
-            """, (idinput.id, idinput.indexer))
-        id2info = cur.fetchall()
-    assert len(id2info) == 1
-    x = id2info[0]
-    return {
-                'id': x[0],
-                'indexer': x[1],
-                'title': x[2],
-                'wikipedia_id': x[3],
-                'type': x[4],
-                'wikidata_qid': x[5],
-                'redirects_to': x[6],
-                'descr': x[7],
-                'url': id2url(x[3]),
-                'props': id2props(x[3])
-            }
+    if indexes[idinput.indexer]['index_type'] == 'http':
+        return indexes[idinput.indexer]['indexer'].id2info(idinput)
+    else:
+        with dbconnection.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    id, indexer, title, wikipedia_id, type_, wikidata_qid, redirects_to, descr
+                FROM
+                    entities
+                WHERE
+                    id = %s AND
+                    indexer = %s;
+                """, (idinput.id, idinput.indexer))
+            id2info = cur.fetchall()
+        assert len(id2info) == 1
+        x = id2info[0]
+        return {
+                    'id': x[0],
+                    'indexer': x[1],
+                    'title': x[2],
+                    'wikipedia_id': x[3],
+                    'type': x[4],
+                    'wikidata_qid': x[5],
+                    'redirects_to': x[6],
+                    'descr': x[7],
+                    'url': id2url(x[3]),
+                    'props': id2props(x[3])
+                }
 
 @app.post('/api/indexer/search')
 async def search_api(input_: Input):
@@ -224,7 +231,7 @@ def search(encodings, top_k, only_indexes=None):
     all_candidates_4_sample_n = []
     for i in range(len(encodings)):
         all_candidates_4_sample_n.append([])
-    for index in indexes:
+    for index in indexes.values():
         if only_indexes and index['indexid'] not in only_indexes:
             # skipping index not in only_indexes
             continue
@@ -449,17 +456,17 @@ def load_models(args):
                 indexer = HttpIndexer(index_path, [indexid])
             else:
                 raise ValueError("Error! Unsupported indexer type! Choose from flat,hnsw.")
-        indexes.append({
+        indexes[int(indexid)] = {
             'indexer': indexer,
             'indexid': int(indexid),
             'path': index_path,
             'index_type': index_type
-            })
+            }
 
         global rw_index
         if rorw == 'rw':
             assert rw_index is None, 'Error! Only one rw index is accepted.'
-            rw_index = len(indexes) - 1 # last added
+            rw_index = int(indexid)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
