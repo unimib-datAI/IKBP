@@ -39,6 +39,7 @@ class HttpIndexer:
         self.type = 'http'
         self.index = _Index(10) # dummy ntotal set to 10
     def search_knn(self, encodings, top_k):
+        encodings = [vector_encode(e) for e in encodings]
         body = {
             'encodings': encodings,
             'top_k': top_k,
@@ -228,7 +229,7 @@ def search(encodings, top_k, only_indexes=None):
             # skipping index not in only_indexes
             continue
         indexer = index['indexer']
-        if indexer.type != 'http':
+        if index['index_type'] != 'http':
             if indexer.index.ntotal == 0:
                 scores = np.zeros((encodings.shape[0], top_k))
                 candidates = -np.ones((encodings.shape[0], top_k)).astype(int)
