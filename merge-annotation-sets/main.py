@@ -50,7 +50,6 @@ def run(body: Input):
   annset_priority = get_annset_priority(doc, body.annset_priority)
   exclusion_list = get_annset_exclusion_list(doc, annset_priority)
   doc = Document.from_dict(doc)
-  type_relation_df = pd.read_csv(args.path_to_type_relation_csv)
   annset_name = 'entities_' + merged_name
   
   doc = create_best_NER_annset(doc, exclusion_list, annset_name, type_relation_df, annset_priority, MAXIMUM_PER_PARTS, MAXIMUM_PARTS)
@@ -78,6 +77,8 @@ if __name__ == '__main__':
 
     if args.path_to_type_relation_csv is None:
         args.path_to_type_relation_csv = './data/type_relation_df.csv'
+    
+    type_relation_df = pd.read_csv(args.path_to_type_relation_csv)
 
     if args.path_to_annset_priotity:
         with open(args.path_to_annset_priotity, 'r') as fd:
