@@ -63,6 +63,13 @@ export default (app) => {
         }
       }
 
+      for (const annot of annset.annotations) {
+        // workaround for issue 1 // TODO remove
+        if (typeof annot.id === 'string' || annot.id instanceof String) {
+          annot.id = parseInt(annot.id);
+        }
+      }
+
       // ensure annset is sorted
       annset.annotations.sort((a, b) => a.start - b.start)
 
