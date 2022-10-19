@@ -9,12 +9,37 @@ import numpy as np
 import os
 from gatenlp import Document
 
+class Req(BaseModel):
+    doc_id: int # doc id
+    skip_pipeline: List[str] = [] # to skip components: the component names in the list will be skipped
+    rename_set: Dict = {} # to rename annotation sets #TODO
+
 app = FastAPI()
 
-@app.post('/api/pipeline')
-async def run(doc: dict = Body(...)):
+@app.post('/api/pipeline/reannotate')
+async def run(req: Req):
+
+    res_doc = requests.get(args.mongo + f'/document/{req.doc_id}')
+    assert res_doc.ok
+
+    doc = res_doc.json()
     doc = Document.from_dict(doc)
 
+    doc.features['pipeline'] = req.skip_pipeline
+
+    doc.features['save'] = False
+    doc.features['reannotate'] = True
+    doc.features['rename_set'] = req.rename_set
+
+    return run(doc, req.doc_id)
+
+
+@app.post('/api/pipeline')
+async def run_pipeline(doc: dict = Body(...)):
+    doc = Document.from_dict(doc)
+    return run(doc)
+
+def run(doc, doc_id = None):
     if not 'pipeline' in doc.features:
         doc.features['pipeline'] = []
 
@@ -106,6 +131,37 @@ async def run(doc: dict = Body(...)):
             raise Exception('Population error')
         doc = Document.from_dict(res_populate.json())
 
+    if doc.features.get('reannotate', False):
+        dict_to_save = doc.to_dict()
+        # remove encodings before saving to db
+        for annset in dict_to_save['annotation_sets'].values():
+            for anno in annset['annotations']:
+                if 'features' in anno and 'linking' in anno['features'] \
+                        and 'encoding' in anno['features']['linking']:
+                    del anno['features']['linking']['encoding']
+
+        # rename annotation sets
+        new_dict_to_save = dict_to_save.copy()
+        del new_dict_to_save['annotation_sets']
+        for annset_name, annset in dict_to_save['annotation_sets'].items():
+            # if in rename --> rename; otherwise --> old annset_name
+            new_name = dict_to_save['features']['rename_set'].get(annset_name, annset_name)
+
+            annset['name'] = new_name
+            new_dict_to_save['annotation_sets'] = {}
+            new_dict_to_save['annotation_sets'][new_name] = annset
+
+        dict_to_save = new_dict_to_save
+
+        body = {
+            'docId': doc_id,
+            'annotationSets': new_dict_to_save['annotation_sets']
+        }
+
+        res_save = requests.post(args.mongo + '/save', json=body)
+        if not res_save.ok:
+            raise Exception('Reannotate error')
+
     if doc.features.get('save', False):
         dict_to_save = doc.to_dict()
         # remove encodings before saving to db
@@ -114,7 +170,7 @@ async def run(doc: dict = Body(...)):
                 if 'features' in anno and 'linking' in anno['features'] \
                         and 'encoding' in anno['features']['linking']:
                     del anno['features']['linking']['encoding']
-        res_save = requests.post(args.mongo, json=dict_to_save)
+        res_save = requests.post(args.mongo + '/document', json=dict_to_save)
         if not res_save.ok:
             raise Exception('Save error')
 
@@ -212,6 +268,6 @@ if __name__ == '__main__':
     if args.nilcluster is None:
         args.nilcluster = args.baseurl + '/api/nilcluster/doc'
     if args.mongo is None:
-        args.mongo = args.baseurl + '/api/mongo/document'
+        args.mongo = args.baseurl + '/api/mongo'
 
     uvicorn.run(app, host = args.host, port = args.port)
