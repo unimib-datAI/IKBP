@@ -57,7 +57,7 @@ const processStataleDocument = (doc, docId) => {
 // Declare a route
 server.get('/mongo/document/:id', async (request, reply) => {
   const { id } = request.params;
-  const [source, docId] = id.split('_');
+  const [source, docId] = id.split(/_(.*)/s);
   const doc = await (await fetch(`${process.env.API_STATALE}/doc_id/${docId}/sorgente/${source}`)).json();
   return processStataleDocument(doc, docId);
 })
