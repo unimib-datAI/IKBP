@@ -19,7 +19,7 @@ app = FastAPI()
 @app.post('/api/pipeline/reannotate')
 async def run(req: Req):
 
-    res_doc = requests.get(args.mongo + f'/document/{req.doc_id}')
+    res_doc = requests.get(args.mongo + f'/document/anon/{req.doc_id}')
     assert res_doc.ok
 
     doc = res_doc.json()
@@ -143,12 +143,13 @@ def run(doc, doc_id = None):
         # rename annotation sets
         new_dict_to_save = dict_to_save.copy()
         del new_dict_to_save['annotation_sets']
+        new_dict_to_save['annotation_sets'] = {}
         for annset_name, annset in dict_to_save['annotation_sets'].items():
             # if in rename --> rename; otherwise --> old annset_name
             new_name = dict_to_save['features']['rename_set'].get(annset_name, annset_name)
 
             annset['name'] = new_name
-            new_dict_to_save['annotation_sets'] = {}
+
             new_dict_to_save['annotation_sets'][new_name] = annset
 
         dict_to_save = new_dict_to_save

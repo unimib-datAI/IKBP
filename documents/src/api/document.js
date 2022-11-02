@@ -39,11 +39,11 @@ export default (app) => {
     }));
 
   /**
-   * Get document by id
+   * Get document helper function
+   * 
+   * anonymous: delete any reference to the database (they may be useful for updating the doc)
    */
-  route.get('/:id', asyncRoute(async (req, res, next) => {
-    const { id } = req.params;
-
+  async function getDocumentById(id, anonymous = false) {
     const document = await DocumentController.findOne(id);
     // convert annotation_sets from list to object
     var new_sets = {}
@@ -70,15 +70,56 @@ export default (app) => {
         }
       }
 
+      if (anonymous) {
+        delete annset['_id'];
+        delete annset['__v'];
+        delete annset['docId'];
+        for (const annot of annset.annotations) {
+          // remove references to db
+          delete annot['_id'];
+          delete annot['__v'];
+          delete annot['annotationSetId'];
+        }
+      }
+
       // ensure annset is sorted
       annset.annotations.sort((a, b) => a.start - b.start)
 
       new_sets[annset.name] = annset;
     }
     document.annotation_sets = new_sets;
+
+    if (anonymous) {
+      delete document['_id'];
+      delete document['__v'];
+      delete document['id'];
+    }
+
     if (document.features) {
       delete document.features.clusters;
     }
+    return document;
+  }
+
+  /**
+   * Get document by id
+   */
+  route.get('/:id', asyncRoute(async (req, res, next) => {
+    const { id } = req.params;
+
+    const document = await getDocumentById(id);
+    
+    return res.json(document).status(200);
+  }));
+
+  /**
+   * Get document by id anonymous
+   */
+   route.get('/anon/:id', asyncRoute(async (req, res, next) => {
+    const { id } = req.params;
+
+    const document = await getDocumentById(id, true);
+    
     return res.json(document).status(200);
   }));
 
