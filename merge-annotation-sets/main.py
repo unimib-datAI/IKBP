@@ -70,7 +70,7 @@ if __name__ == '__main__':
         "--path-to-type-relation-csv", type=str, default=None, dest='path_to_type_relation_csv', help="Path to type realtion csv",
     )
     parser.add_argument(
-        "--path-to-annset-priotity", type=str, default=None, dest='path_to_annset_priotity', help="Path to annset priotity (JSON list of wildcards)",
+        "--path-to-annset-priority", type=str, default=None, dest='path_to_annset_priotity', help="Path to annset priotity (JSON list of wildcards)",
     )
 
     args = parser.parse_args()

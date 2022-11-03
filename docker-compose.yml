@@ -114,6 +114,7 @@ services:
       - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
     environment:
       PATH_TO_TYPE_RELATION_CSV: /home/app/models/mergener/type_relation_df.csv
+      PATH_TO_ANNSET_PRIORITY: /home/app/models/mergener/annset_priority.json
 
   pipeline:
     restart: $RESTART_POLICY
