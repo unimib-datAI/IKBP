@@ -48,7 +48,7 @@ class DataEvolverIterator:
 
 
 class Cluster:
-    def __init__(self, mentions=None, entities=None, encodings_list=None, mentions_id=None, center_type='medoid'):
+    def __init__(self, mentions=None, entities=None, encodings_list=None, mentions_id=None, types=None, center_type='medoid'):
         if encodings_list is None:
             encodings_list = []
         if entities is None:
@@ -57,22 +57,33 @@ class Cluster:
             mentions_id = []
         if mentions is None:
             mentions = []
+        if types is None:
+            types = []
 
         self.encodings_list = encodings_list
         self.mentions_id = mentions_id
         self.mentions = mentions
         self.entities = entities
+        self.types = types
         self.center = None
         self.center_type = center_type
 
     def get_title(self):
-        return pd.Series(self.mentions).value_counts().index[0]
+        return pd.Series(self.mentions).mode()[0]
 
-    def add_element(self, mention, entity, encodings, mentions_id):
+    def get_type(self):
+        if not self.types:
+            return ''
+        else:
+            return pd.Series(self.types).mode()[0]
+
+    def add_element(self, mention, entity, encodings, mentions_id, type_=None):
         self.mentions_id.append(mentions_id)
         self.mentions.append(mention)
         self.entities.append(entity)
         self.encodings_list.append(encodings)
+        if type_:
+            self.types.append(type_)
 
     def count_ents(self):
         return Counter(self.entities)
@@ -95,7 +106,8 @@ class Cluster:
     def __add__(self, other):
         return Cluster(mentions=self.mentions + other.mentions, entities=self.entities + other.entities,
                        encodings_list=self.encodings_list + other.encodings_list,
-                       mentions_id=self.mentions_id + other.mentions_id)
+                       mentions_id=self.mentions_id + other.mentions_id,
+                       types=self.types + other.types)
 
     def __repr__(self):
         return "Cluster" + self.print_to_html().__repr__() + "; #_elements = " + str(len(self.mentions))
@@ -106,9 +118,9 @@ class Cluster:
 
     def __iter__(self):
         yield 'title', self.get_title()
+        yield 'type', self.get_type()
         yield 'nelements', len(self.mentions)
-        yield 'mentions_id', self.mentions_id
-        yield 'mentions', self.mentions
+        yield 'mentions', [{'id': _id, 'mention': _mention} for _id,_mention in zip(self.mentions_id, self.mentions)]
         yield 'center', vector_encode(self.center)
 
     def print_to_html(self):

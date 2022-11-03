@@ -37,6 +37,8 @@ services:
       PORT: 3001
       ENABLE_AUTH: false
       MONGO: mongodb://usr:$MONGO_PASSWORD@mongo:27017/main
+    volumes:
+      - ./documents/src:/app/src
 
   biencoder:
     restart: $RESTART_POLICY
@@ -80,6 +82,10 @@ services:
     build:
         context: ./nilcluster
         dockerfile: Dockerfile
+    volumes:
+      - ./nilcluster/main.py:/home/app/main.py
+      - ./nilcluster/Packages:/home/app/Packages
+        #command: sleep 7200
     # command: python main.py --host 0.0.0.0 --port 80
 
   nilpredictor:

@@ -43,7 +43,7 @@ export default (app) => {
    * 
    * anonymous: delete any reference to the database (they may be useful for updating the doc)
    */
-  async function getDocumentById(id, anonymous = false) {
+  async function getDocumentById(id, anonymous = false, clusters = false) {
     const document = await DocumentController.findOne(id);
     // convert annotation_sets from list to object
     var new_sets = {}
@@ -95,8 +95,12 @@ export default (app) => {
       delete document['id'];
     }
 
-    if (document.features) {
-      delete document.features.clusters;
+    if (!clusters && document.features) {
+      for (const [annset_name, annset_clusters] of Object.entries(document.features.clusters)) {
+        for (let i = 0; i < annset_clusters.length; i++) {
+          delete annset_clusters[i]["center"];
+        }
+      }
     }
     return document;
   }
@@ -119,6 +123,17 @@ export default (app) => {
     const { id } = req.params;
 
     const document = await getDocumentById(id, true);
+    
+    return res.json(document).status(200);
+  }));
+
+  /**
+   * Get document by id anonymous
+   */
+   route.get('/clusters/:id', asyncRoute(async (req, res, next) => {
+    const { id } = req.params;
+
+    const document = await getDocumentById(id, false, true);
     
     return res.json(document).status(200);
   }));

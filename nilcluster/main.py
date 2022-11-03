@@ -68,6 +68,7 @@ class Item(BaseModel):
     mentions: List[str]
     embeddings: Optional[List[str]]
     encodings: Optional[List[str]]
+    types: Optional[List[str]]
 
 app = FastAPI()
 
@@ -76,7 +77,7 @@ async def cluster_mention_from_doc(doc: dict = Body(...)):
     doc = Document.from_dict(doc)
 
     if not 'clusters' in doc.features:
-        doc.features['clusters'] = []
+        doc.features['clusters'] = {}
 
     # mentions from different annotation_sets are not clustered together
     for annset_name in doc.annset_names():
@@ -84,7 +85,7 @@ async def cluster_mention_from_doc(doc: dict = Body(...)):
             # considering only annotation sets of entities
             continue
 
-        item = Item(ids=[], mentions=[], embeddings=[])
+        item = Item(ids=[], mentions=[], embeddings=[], types=[])
 
         # select nil mentions
         for mention in doc.annset(annset_name):
@@ -94,6 +95,7 @@ async def cluster_mention_from_doc(doc: dict = Body(...)):
                                                             else doc.text[mention.start:mention.end]
                 item.mentions.append(mention_text)
                 item.embeddings.append(mention.features['linking']['encoding'])
+                item.types.append(mention.type)
 
         res_cluster = cluster_mention(item)
         if not res_cluster:
@@ -103,16 +105,16 @@ async def cluster_mention_from_doc(doc: dict = Body(...)):
         current_clusters = []
 
         for cluster_id, cluster in enumerate(res_cluster):
-            current_clusters.append(dict(cluster))
+            _clust = dict(cluster)
+            _clust['id'] = cluster_id
+            current_clusters.append(_clust)
             # set cluster id in the mention annotation
             all_mentions = doc.annset(annset_name)
             for men_id in cluster.mentions_id:
                 mention = all_mentions.get(men_id)
                 mention.features['cluster'] = cluster_id
 
-        doc.features['clusters'].append({
-            annset_name: current_clusters
-        })
+        doc.features['clusters'][annset_name] = current_clusters
 
     if not 'pipeline' in doc.features:
         doc.features['pipeline'] = []
@@ -140,6 +142,9 @@ def cluster_mention(item: Item):
         raise Exception('Either "embeddings" or "encodings" field is required.')
     current_encodings = [vector_decode(e) for e in item.embeddings]
 
+    if not item.types:
+        item.types = []
+
     print('STEP 1')
     if len(current_mentions) == 1:
         cluster_numbers = np.zeros(1, dtype=np.int8)
@@ -156,13 +161,15 @@ def cluster_mention(item: Item):
 
     #Creo e vado a riempire un dizionario con chiave il numero del cluster e le menzioni all'interno del cluster, le entita corrispondenti
     #e l'encoding corrispondente ad: {0 : {entities: 'Milano', 'Milano', mentions: 'Milan', 'Milano', encodings:[[343][443]}}
-    cee_dict = {k: {'mentions_id': [], 'mentions': [], 'encodings': [], 'sotto_clusters': None} for k in
+    cee_dict = {k: {'mentions_id': [], 'mentions': [], 'encodings': [], 'sotto_clusters': None, 'types': []} for k in
                 set(cluster_numbers)}
 
     for i, cluster in enumerate(cluster_numbers):
         cee_dict[cluster]['mentions_id'].append(ids[i])
         cee_dict[cluster]['mentions'].append(current_mentions[i])
         cee_dict[cluster]['encodings'].append(current_encodings[i])
+        if item.types:
+            cee_dict[cluster]['types'].append(item.types[i])
 
     #STEP 2 - CLUSTERIZZAZIONE SEMANTICA - anche in questo caso agglomerativo: vado a raggruppare all'interno di ogni cluster,
     #creato nella fase precedente, gli elementi sulla base del loro encoding che tiene conto della semantica(BERT-encoding)
@@ -195,10 +202,13 @@ def cluster_mention(item: Item):
             #in sottocluster i-esimo (key) quindi ad esempio sottocluster  0 aggiungo come valore l'entita' menzione e encoding
             #corrispondente ( un po' come il lavoro fatto prima ma ora per ogni sottocluster)
             sotto_cluster[key].add_element(mention=el['mentions'][i], entity='entity',
-                                           encodings=el['encodings'][i], mentions_id=el['mentions_id'][i])
+                                           encodings=el['encodings'][i],
+                                           mentions_id=el['mentions_id'][i],
+                                           type_ = el['types'][i])
         #append alla liste sottocluster_list questo dizionario(1 dizionario per ogni cluster in cui all'interno abbiamo
         #il numero di sottocluster con le sue menzioni-entita'-encoding)
         sottocluster_list.append(sotto_cluster)
+
 
     sottocluster_list = [clusters_dict[key] for clusters_dict in sottocluster_list for key in clusters_dict]
 
@@ -216,6 +226,7 @@ def cluster_mention(item: Item):
                                                  distance_threshold=0.05,
                                                  linkage="single")
         cluster_numbers = clusterizator3.fit_predict(sotto_encodings)
+
     final_clusters = {k: Cluster() for k in set(cluster_numbers)}
     last_key = list(set(final_clusters.keys()))[-1]
     for i, x in enumerate(current_clusters):
@@ -227,6 +238,7 @@ def cluster_mention(item: Item):
     total_clusters = list(final_clusters.values())
     broken_cluster = []
     to_remove_cluster = []
+
     for cl_index, cl in enumerate(total_clusters):
         if len(set([men.lower() for men in cl.mentions])) > 25:
             X = np.array(cl.mentions).reshape(-1, 1)
@@ -237,7 +249,8 @@ def cluster_mention(item: Item):
             br_cluster_number = br_clusterizator.fit_predict(m_sub_matrix)
             br_cluster_dict = {k: Cluster() for k in set(br_cluster_number)}
             for i, cluster in enumerate(br_cluster_number):
-                br_cluster_dict[cluster].add_element(cl.mentions[i], cl.entities[i], cl.encodings_list[i], cl.mentions_id[i])
+                type_ =  cl.types[i] if cl.types else None
+                br_cluster_dict[cluster].add_element(cl.mentions[i], cl.entities[i], cl.encodings_list[i], cl.mentions_id[i], type_)
             broken_cluster = broken_cluster + list(br_cluster_dict.values())
             to_remove_cluster.append(cl_index)
     for i in sorted(to_remove_cluster, reverse=True):
