@@ -118,6 +118,9 @@ services:
         dockerfile: Dockerfile
     volumes:
       - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - ./merge-annotation-sets/main.py:/home/app/main.py
+      - ./merge-annotation-sets/build_type_relation_df.py:/home/app/build_type_relation_df.py
+      - ./merge-annotation-sets/merge_sets.py:/home/app/merge_sets.py
     environment:
       PATH_TO_TYPE_RELATION_CSV: /home/app/models/mergener/type_relation_df.csv
       PATH_TO_ANNSET_PRIORITY: /home/app/models/mergener/annset_priority.json
