@@ -1,5 +1,6 @@
 from collections import Counter
 from itertools import groupby
+import logging
 
 class MyAnnotation:
   def __init__(self, start, end, length, ann_type, root_type, text, source):
@@ -10,7 +11,7 @@ class MyAnnotation:
     self.root_type = root_type
     self.text = text
     self.source = source
-  
+
   def __repr__(self):
     """
     String representation of the annotation.
@@ -18,7 +19,7 @@ class MyAnnotation:
     return "MyAnnotation({},{},{},{},{},{},{})".format(
         self.start, self.end, self.length, self.ann_type, self.root_type, self.text, self.source
         )
-  
+
   def is_equal(self, other_ann, exclude=[]) -> bool:
     if (self.start == other_ann.start or 'start' in exclude)\
       and (self.end == other_ann.end or 'end' in exclude)\
@@ -28,7 +29,7 @@ class MyAnnotation:
       return True
     else:
       return False
-  
+
   def is_in(self, ann_list, exclude=[]) -> bool:
     if any([self.is_equal(ann, exclude=exclude) for ann in ann_list]):
       return True
@@ -58,7 +59,7 @@ def get_root_type(ann, annset, type_relation_df):
   #  return entity_db[entity_db['type'] == ann_type.lower()]['root_type'].iloc[0].upper()
   #except:
   #  return ann_type.upper()
-  
+
   # check annotations fully overlapped from the same source and then check relation_df in column "role" and write column "type"
   # I stop at the first matched other_ann, because in a group of fully overlapped annotations from the same source, only one can be the root_type
   for other_ann in annset:
@@ -76,19 +77,19 @@ def get_root_type(ann, annset, type_relation_df):
 def preprocess_annset(doc, annset_exclusion_list, type_relation_df):
   # selected annset
   selected_annset_names = [annset_name for annset_name in doc.annset_names() if annset_name not in annset_exclusion_list]
-  
+
   myannotation_list = []
   for annset_name in selected_annset_names:
     myannotation_temp_list = [
         MyAnnotation(
-            ann.start, 
-            ann.end, 
-            ann.end - ann.start, 
-            normalize_entity(ann.type), 
-            get_root_type(ann, doc.anns(annset_name), type_relation_df), 
+            ann.start,
+            ann.end,
+            ann.end - ann.start,
+            normalize_entity(ann.type),
+            get_root_type(ann, doc.anns(annset_name), type_relation_df),
             doc.text[ann.start:ann.end],
             source = annset_name
-            ) 
+            )
         for ann in doc.anns(annset_name)]
     myannotation_list.extend(myannotation_temp_list)
   ordered_myannotation_list = [annotation for annotation in sorted(myannotation_list, key=lambda ann: (ann.start, ann.end, ann.ann_type))]
@@ -126,7 +127,7 @@ def analyze_overlap(annotation_set_input):
             disjoint_intervals.append(current_element)
 
     return partial_intervals, overlap_intervals, disjoint_intervals
-        
+
 
 def extract_partial(current_element, annotation_set):
     current_partial = []
@@ -136,7 +137,7 @@ def extract_partial(current_element, annotation_set):
 
 
 def is_disjoint(item_1, item_2):
-  # TODO reason about <=; we are using gatenlp with python-style offsets (end not included) 
+  # TODO reason about <=; we are using gatenlp with python-style offsets (end not included)
     return item_1.end <= item_2.start or item_2.end <= item_1.start
 
 
@@ -149,7 +150,7 @@ def is_partial(item_1, item_2):
 
 def get_unique_ann(ann_list_input, best_ner_name):
   '''
-  Get a list of unique annotations. Annotations are equal if all their 
+  Get a list of unique annotations. Annotations are equal if all their
   attributes are equal except for source.
   '''
   ann_list = ann_list_input.copy()
@@ -174,7 +175,7 @@ def check_annset_priority(ann_list, annset_priority):
   reduced_annset_priority = {key: val for key, val in annset_priority.items() if key in [x.source for x in ann_list]}
   max_value = max([val for key, val in reduced_annset_priority.items()])
   reduced_annset_max_priority = [key for key, val in reduced_annset_priority.items() if val==max_value]
-  
+
   if len(reduced_annset_max_priority) == 1:
     return reduced_annset_max_priority[0]
   else:
@@ -182,13 +183,13 @@ def check_annset_priority(ann_list, annset_priority):
 
 def check_root_type(ann_list, annset_priority) -> list:
   '''
-  Return integer, root type filter. Return 1 if all types equal, 2 if 
-  root_types different, but prevalent root_type exists, 3 if root_types 
-  different and prevalent root_type does not exist, but metadata source exists 
-  and it is chosen and root_type is unique, 4 if root_types 
-  different and prevalent root_type does not exist, but metadata source exists 
-  and it is chosen, but root_type is unique, 5 if root_types are different and 
-  prevalent root_type does not exist and metadata source does not exist. All 
+  Return integer, root type filter. Return 1 if all types equal, 2 if
+  root_types different, but prevalent root_type exists, 3 if root_types
+  different and prevalent root_type does not exist, but metadata source exists
+  and it is chosen and root_type is unique, 4 if root_types
+  different and prevalent root_type does not exist, but metadata source exists
+  and it is chosen, but root_type is unique, 5 if root_types are different and
+  prevalent root_type does not exist and metadata source does not exist. All
   sources are kept.
   '''
   root_type_Counter = Counter([x.root_type for x in ann_list])
@@ -201,27 +202,27 @@ def check_root_type(ann_list, annset_priority) -> list:
   if len(root_type_Counter.most_common()) == 1: # there is only one group
 
     return 1, [most_frequent_type]
-  
+
   # 2) root_types different, but prevalent root_type exists
   elif root_type_Counter.most_common(2)[0][1] > root_type_Counter.most_common(2)[1][1]: # there is no tie in the most common root_type
 
     return 2, [most_frequent_type]
 
-  # 3) root_types different and prevalent root_type does not exist, but metadata 
+  # 3) root_types different and prevalent root_type does not exist, but metadata
   #    source exists and it is chosen and root_type is unique
   elif local_annset_priority\
-  and len(list(filtered_root_type_Counter)) == 1:   
-    
+  and len(list(filtered_root_type_Counter)) == 1:
+
     return 3, list(filtered_root_type_Counter)
-  
+
   # 4) as per 3, but metadata source root_type is not unique
   elif local_annset_priority:
     logging.warning('metadata source has multiple root type')
-    return 4, list(filtered_root_type_Counter) 
+    return 4, list(filtered_root_type_Counter)
 
-  # 5) root_types different and prevalent root_type does not exist and metadata 
+  # 5) root_types different and prevalent root_type does not exist and metadata
   #    source does not exist
-  else: 
+  else:
     return 5, list(root_type_Counter)  #return unique elements
 
 def reduce_disjoints(disjoints, best_ner_name):
@@ -229,33 +230,33 @@ def reduce_disjoints(disjoints, best_ner_name):
 
 def reduce_overlaps(overlaps, best_ner_name, annset_priority):
   cleaned_overlap_list = []
-  
+
   for ann_list in overlaps:
     type_analysis_result, root_type_filter = check_root_type(ann_list, annset_priority)
-    
-    #print(type_analysis_result) # Keep for debug   
+
+    #print(type_analysis_result) # Keep for debug
     filtered_list = [x for x in ann_list if x.root_type in root_type_filter] # Filter ann_list by type analysis result
     cleaned_overlap_list.extend(get_unique_ann(filtered_list, best_ner_name))  # remove duplicates
-  
+
   return cleaned_overlap_list
 
 def inner_reduce_partial_overlaps(ann_list, best_ner_name, annset_priority, maximum_per_parts, maximum_parts):
   type_analysis_result, root_type_filter = check_root_type(ann_list, annset_priority)
   # print(type_analysis_result, root_type_filter) # keep for debug
-  
+
   # if type analysis is possible and root_type is PER
-  if type_analysis_result != 4 and 'PER' in root_type_filter:     
+  if type_analysis_result != 4 and 'PER' in root_type_filter:
     current_maximum_parts = maximum_per_parts # set proper maximum n° of parts if PER
   else:
     current_maximum_parts = maximum_parts # set proper maximum n° of parts
 
-  # keep only root_type_filter (no filter if type analysis is not possible) with n° of parts <= current_maximum_parts and sort desc 
-  sorted_filtered_list = [annotation for annotation 
-                          in sorted(ann_list, 
-                                    reverse=True, 
-                                    key=lambda ann: ann.length) 
-                          if annotation.root_type in root_type_filter 
-                          and len(annotation.text.split()) <= current_maximum_parts] 
+  # keep only root_type_filter (no filter if type analysis is not possible) with n° of parts <= current_maximum_parts and sort desc
+  sorted_filtered_list = [annotation for annotation
+                          in sorted(ann_list,
+                                    reverse=True,
+                                    key=lambda ann: ann.length)
+                          if annotation.root_type in root_type_filter
+                          and len(annotation.text.split()) <= current_maximum_parts]
 
   # filter by maximum_length
   maximum_length = sorted_filtered_list[0].length
@@ -273,12 +274,12 @@ def reduce_partial_overlaps(partial_overlaps, best_ner_name, annset_priority, ma
   #     if not keep longest with a failsafe (maximum_parts)
   #     if yes keep longest of ann with n° of parts <= maximum_per_parts
   cleaned_partial_overlap_list = []
-  
+
   for ann_list in partial_overlaps:
     type_analysis_result, longest_ann_list = inner_reduce_partial_overlaps(ann_list, best_ner_name, annset_priority, maximum_per_parts, maximum_parts)
     # print(longest_ann_list) # keep for debug
-    
-    # if type analysis is not possible on original ann_list, do it again on longest_ann_list. 
+
+    # if type analysis is not possible on original ann_list, do it again on longest_ann_list.
     # Having a different n° of annotations, results may be different
     # worst case scenario, all longest results are kept
     if type_analysis_result == 4:
@@ -286,23 +287,23 @@ def reduce_partial_overlaps(partial_overlaps, best_ner_name, annset_priority, ma
 
     # remove duplicates
     cleaned_partial_overlap_list.extend(get_unique_ann(longest_ann_list, best_ner_name)) # may contain more than one element (e.g. GIUDICE e PER)
-  
+
   return cleaned_partial_overlap_list
 
 def create_best_NER_annset(doc, annset_exclusion_list, best_ner_name, type_relation_df, annset_priority, maximum_per_parts, maximum_parts):
   ordered_myannotation_list = preprocess_annset(doc, annset_exclusion_list, type_relation_df)
   partial_overlaps, overlaps, disjoints = analyze_overlap(ordered_myannotation_list)
   best_NER_list = []
-  best_NER_list.extend(reduce_disjoints(disjoints, best_ner_name))  
+  best_NER_list.extend(reduce_disjoints(disjoints, best_ner_name))
   best_NER_list.extend(reduce_overlaps(overlaps, best_ner_name, annset_priority))
   best_NER_list.extend(reduce_partial_overlaps(partial_overlaps, best_ner_name, annset_priority, maximum_per_parts, maximum_parts))
-  
-  try: 
+
+  try:
       doc.annset(best_ner_name).clear()
   except:
     pass
   annset = doc.annset(best_ner_name)
 
   for ent in best_NER_list:
-    annset.add(ent.start, ent.end, ent.ann_type,{'text': ent.text})  
+    annset.add(ent.start, ent.end, ent.ann_type,{'text': ent.text})
   return doc
