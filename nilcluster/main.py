@@ -76,7 +76,7 @@ app = FastAPI()
 async def cluster_mention_from_doc(doc: dict = Body(...)):
     doc = Document.from_dict(doc)
 
-    if not 'clusters' in doc.features:
+    if not 'clusters' in doc.features or not isinstance(doc.features['clusters'], dict):
         doc.features['clusters'] = {}
 
     # mentions from different annotation_sets are not clustered together
