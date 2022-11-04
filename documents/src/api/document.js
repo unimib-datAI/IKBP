@@ -11,6 +11,27 @@ import { Annotation, annotationDTO } from '../models/annotation';
 
 const route = Router();
 
+const deleteDoc = async (req, res, next) => {
+  const { docId } = req.params;
+  // delete document and return deleted document
+  const deletedDoc = await Document.findOneAndDelete({ id: docId });
+  // get all annotation sets to delete
+  const annotationSets = await AnnotationSet.find({ docId });
+  await Promise.all(annotationSets.map(async (annSet) => {
+    // delete annotations for each annotation set
+    await Annotation.deleteMany({ annotationSetId: annSet._id });
+  }))
+  // delete annotation sets for the document
+  await AnnotationSet.deleteMany({ docId });
+
+  if (res) {
+    return res.json(deletedDoc);
+  } else {
+    return deletedDoc;
+  }
+
+};
+
 export default (app) => {
   // route base root
   app.use('/document', route);
@@ -40,7 +61,7 @@ export default (app) => {
 
   /**
    * Get document helper function
-   * 
+   *
    * anonymous: delete any reference to the database (they may be useful for updating the doc)
    */
   async function getDocumentById(id, anonymous = false, clusters = false) {
@@ -95,7 +116,7 @@ export default (app) => {
       delete document['id'];
     }
 
-    if (!clusters && document.features) {
+    if (!clusters && document.features && document.features.clusters) {
       for (const [annset_name, annset_clusters] of Object.entries(document.features.clusters)) {
         for (let i = 0; i < annset_clusters.length; i++) {
           delete annset_clusters[i]["center"];
@@ -112,7 +133,7 @@ export default (app) => {
     const { id } = req.params;
 
     const document = await getDocumentById(id);
-    
+
     return res.json(document).status(200);
   }));
 
@@ -123,7 +144,7 @@ export default (app) => {
     const { id } = req.params;
 
     const document = await getDocumentById(id, true);
-    
+
     return res.json(document).status(200);
   }));
 
@@ -134,9 +155,53 @@ export default (app) => {
     const { id } = req.params;
 
     const document = await getDocumentById(id, false, true);
-    
+
     return res.json(document).status(200);
   }));
+
+/**
+   * Update a document
+   */
+ route.post('/:id',
+ validateRequest(
+   {
+     req: {
+       body: z.object({
+         text: z.string(),
+         annotation_sets: z.object(),
+         preview: z.string().optional(),
+         name: z.string().optional(),
+         features: z.object().optional(),
+         offset_type: z.string().optional()
+       })
+     }
+   }
+ ),
+ asyncRoute(async (req, res, next) => {
+   // delete document // TODO ROLLBACK on Failure
+   const { id } = req.params;
+   const deleteResults = await deleteDoc({params: {docId: id}}, null, next);
+   // new document object
+   const pre_doc = req.body;
+   pre_doc["id"] = id
+   const newDoc = documentDTO(req.body);
+
+   const doc = await DocumentController.insertOne(newDoc);
+   // insert each annnotation set
+   await Promise.all(Object.values(req.body.annotation_sets).map(async (set) => {
+     const { annotations: newAnnotations, ...rest } = set;
+     const newAnnSet = annotationSetDTO({ docId: doc.id, ...rest });
+     const annSet = await AnnotationSetController.insertOne(newAnnSet);
+     // insert all annotations for a set
+     const newAnnotationsDTOs = newAnnotations.map((ann) => annotationDTO({ annotationSetId: annSet._id, ...ann }));
+     await Annotation.insertMany(newAnnotationsDTOs);
+
+     return annSet;
+   }));
+
+   return res.json(doc).status(200);
+ }));
+
 
   /**
    * Create a new document
@@ -176,21 +241,7 @@ export default (app) => {
     }));
 
   route.delete('/:docId',
-    asyncRoute(async (req, res, next) => {
-      const { docId } = req.params;
-      // delete document and return deleted document
-      const deletedDoc = await Document.findOneAndDelete({ id: docId });
-      // get all annotation sets to delete
-      const annotationSets = await AnnotationSet.find({ docId });
-      await Promise.all(annotationSets.map(async (annSet) => {
-        // delete annotations for each annotation set
-        await Annotation.deleteMany({ annotationSetId: annSet._id });
-      }))
-      // delete annotation sets for the document
-      await AnnotationSet.deleteMany({ docId });
-
-      return res.json(deletedDoc);
-    }));
+    asyncRoute(deleteDoc));
 
   route.delete('/:docId/annotation-set/:annotationSetId',
     asyncRoute(async (req, res, next) => {

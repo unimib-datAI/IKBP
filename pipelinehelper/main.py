@@ -154,12 +154,7 @@ def run(doc, doc_id = None):
 
         dict_to_save = new_dict_to_save
 
-        body = {
-            'docId': doc_id,
-            'annotationSets': new_dict_to_save['annotation_sets']
-        }
-
-        res_save = requests.post(args.mongo + '/save', json=body)
+        res_save = requests.post(args.mongo + f'/document/{doc_id}', json=dict_to_save)
         if not res_save.ok:
             raise Exception('Reannotate error')
 

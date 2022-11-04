@@ -9,7 +9,12 @@ import { Annotation, annotationDTO } from '../models/annotation';
 export const DocumentController = {
   insertOne: async (document) => {
     try {
-      const doc = await document.save();
+      const doc = await document.save().then(doc => {
+        if (doc.id === undefined) {
+          doc.id = doc.inc_id;
+        }
+        return doc.save();
+      });
       return doc;
     } catch (err) {
       throw new HTTPError({

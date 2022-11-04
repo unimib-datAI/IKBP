@@ -3,6 +3,10 @@ import Inc from "mongoose-sequence";
 import paginate from 'mongoose-paginate-v2';
 
 const schema = new mongoose.Schema({
+  id: {
+    type: Number,
+    required: false
+  },
   name: String,
   preview: String,
   text: String,
@@ -12,7 +16,7 @@ const schema = new mongoose.Schema({
 
 // add field for auto increment id
 const AutoIncrement = Inc(mongoose);
-schema.plugin(AutoIncrement, { inc_field: 'id' });
+schema.plugin(AutoIncrement, { inc_field: 'inc_id' });
 // add pagination for this schema
 schema.plugin(paginate);
 export const Document = mongoose.model('Document', schema, 'documents');
@@ -23,5 +27,6 @@ export const documentDTO = (body) => {
   const name = body.name || body.text.split(' ').slice(0, 3).join(' ');
   const features = body.features;
   const offset_type = body.offset_type || "p";
-  return new Document({ name, preview, text, features, offset_type });
+  const id = body.id;
+  return new Document({ id, name, preview, text, features, offset_type });
 }
