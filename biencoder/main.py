@@ -44,13 +44,15 @@ app = FastAPI()
 async def encode_mention_from_doc(doc: dict = Body(...)):
     doc = Document.from_dict(doc)
 
+    annsets_to_link = set(doc.features.get('annsets_to_link', 'entities_merged'))
+
     samples = []
     mentions = []
 
-    for annset_name in doc.annset_names():
-        if not annset_name.startswith('entities'):
-            # considering only annotation sets of entities
-            continue
+    for annset_name in set(doc.annset_names()).intersection(annsets_to_link):
+        # if not annset_name.startswith('entities'):
+        #     # considering only annotation sets of entities
+        #     continue
         for mention in doc.annset(annset_name):
             if 'linking' in mention.features and mention.features['linking'].get('skip', False):
                 # DATES should skip = true bcs linking useless

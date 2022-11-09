@@ -76,14 +76,16 @@ app = FastAPI()
 async def cluster_mention_from_doc(doc: dict = Body(...)):
     doc = Document.from_dict(doc)
 
+    annsets_to_link = set(doc.features.get('annsets_to_link', 'entities_merged'))
+
     if not 'clusters' in doc.features or not isinstance(doc.features['clusters'], dict):
         doc.features['clusters'] = {}
 
     # mentions from different annotation_sets are not clustered together
-    for annset_name in doc.annset_names():
-        if not annset_name.startswith('entities'):
-            # considering only annotation sets of entities
-            continue
+    for annset_name in set(doc.annset_names()).intersection(annsets_to_link):
+        # if not annset_name.startswith('entities'):
+        #     # considering only annotation sets of entities
+        #     continue
 
         item = Item(ids=[], mentions=[], embeddings=[], types=[])
 

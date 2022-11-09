@@ -99,22 +99,22 @@ def run(doc, doc_id = None):
             raise Exception('NIL prediction error')
         doc = Document.from_dict(res_nilprediction.json())
 
-    # if top_candidate is not NIL, then set its type as NER type #TODO study if ner is the correct place for the type
-    for annset_name in doc.annset_names():
-        if not annset_name.startswith('entities'):
-            # considering only annotation sets of entities
-            continue
-        for annotation in doc.annset(annset_name):
-            if annotation.features['linking'].get('skip'):
-                continue
-            if annotation.features['linking']['top_candidate'].get('type_'):
-                # TODO check hierarchy or combine as a different annotation
-                if annotation.type != annotation.features['linking']['top_candidate']['type_']:
-                    if not annotation.features.get('types'):
-                        annotation.features['types'] = []
-                    annotation.features['types'].append(annotation.type)
-                    annotation._type = annotation.features['linking']['top_candidate']['type_']
-    # TODO ensure consistency between types
+    # # if top_candidate is not NIL, then set its type as NER type #TODO study if ner is the correct place for the type
+    # for annset_name in doc.annset_names():
+    #     if not annset_name.startswith('entities'):
+    #         # considering only annotation sets of entities
+    #         continue
+    #     for annotation in doc.annset(annset_name):
+    #         if annotation.features['linking'].get('skip'):
+    #             continue
+    #         if annotation.features['linking']['top_candidate'].get('type_'):
+    #             # TODO check hierarchy or combine as a different annotation
+    #             if annotation.type != annotation.features['linking']['top_candidate']['type_']:
+    #                 if not annotation.features.get('types'):
+    #                     annotation.features['types'] = []
+    #                 annotation.features['types'].append(annotation.type)
+    #                 annotation._type = annotation.features['linking']['top_candidate']['type_']
+    # # TODO ensure consistency between types
 
     if 'nilclustering' in doc.features['pipeline']:
         print('Skipping nilclustering: already done')

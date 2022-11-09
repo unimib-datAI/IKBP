@@ -36,7 +36,7 @@ class Input(BaseModel):
 
 @app.post('/api/mergesets/doc')
 async def run_api_doc(doc: dict = Body(...)):
-    body = Input(doc=doc, merged_name='entities_merged', annset_priority=annset_priority_g)
+    body = Input(doc=doc, merged_name='merged', annset_priority=annset_priority_g)
     return run(body)
     
 

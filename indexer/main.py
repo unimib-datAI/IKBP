@@ -149,12 +149,14 @@ async def search_from_doc_topk_api(top_k: int, doc: dict = Body(...)):
 def search_from_doc_topk(top_k, doc):
     doc = Document.from_dict(doc)
 
+    annsets_to_link = set(doc.features.get('annsets_to_link', 'entities_merged'))
+
     encodings = []
     mentions = []
-    for annset_name in doc.annset_names():
-        if not annset_name.startswith('entities'):
-            # considering only annotation sets of entities
-            continue
+    for annset_name in set(doc.annset_names()).intersection(annsets_to_link):
+        # if not annset_name.startswith('entities'):
+        #     # considering only annotation sets of entities
+        #     continue
         for mention in doc.annset(annset_name):
             if 'linking' in mention.features and mention.features['linking'].get('skip', False):
                 # DATES should skip = true bcs linking useless
