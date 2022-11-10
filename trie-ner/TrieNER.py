@@ -72,8 +72,15 @@ class TrieNER:
             'type': types[0],
             'features': {
                 'mention': pattern,
-                'types': types[1:],
-                'entities': entities
+                'types': types,
+                'triener': {
+                    'entities': entities
+                },
+                'linking': {
+                    'skip': len(entities == 1) # skip linking if certain: only 1 candidate
+                },
+                'title': entities[0]['name'] if len(entities == 1) else '',
+                'url': 'TRIE{}'.format(entities[0]['id']) if len(entities == 1) else ''
             }
         }
     

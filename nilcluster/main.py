@@ -130,13 +130,14 @@ async def cluster_mention_from_doc(doc: dict = Body(...)):
             else:
                 if mention.features['url'] not in not_nil_clusters:
                     not_nil_clusters[mention.features['url']] = {
-                        'top_candidate': mention.features['linking']['top_candidate'],
                         'title': mention.features['title'],
-                        'type': mention.features['linking']['top_candidate'].get('type'),
                         'nelements': 0,
                         'mentions': [],
                         '_types': []
                     }
+                # type from linking
+                if mention.features.get('top_candidate') and mention.features.get('top_candidate').get('type'):
+                    not_nil_clusters[mention.features['url']]['type'] = mention.features.get('top_candidate').get('type')
                 not_nil_clusters[mention.features['url']]['mentions'].append({
                     'id': mention.id, 'mention': mention.features.get('mention', doc.text[mention.start:mention.end])
                 })
