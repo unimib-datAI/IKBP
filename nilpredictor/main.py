@@ -85,6 +85,16 @@ async def nilprediction_doc_api(doc: dict = Body(...)):
         if add_score_bi:
             mention.features['linking']['nil_score_bi'] = nil_results[score_label][i]
 
+        # delete title and url for nil
+        if mention.features['linking']['is_nil']:
+            mention.features['title'] = ""
+            mention.features['url'] = ""
+        else:
+            # add linking type now that we know it's not nil
+            if mention.features['linking']['top_candidate'].get('type_'):
+                mention.features['types'].append(mention.features['linking']['top_candidate']['type_'])
+            mention.features['types'] = list(set(mention.features['types']))
+
     if not 'pipeline' in doc.features:
         doc.features['pipeline'] = []
     doc.features['pipeline'].append('nilprediction')

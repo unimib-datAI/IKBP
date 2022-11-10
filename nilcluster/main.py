@@ -10,6 +10,7 @@ import numpy as np
 import base64
 from Packages.TimeEvolving import Cluster, compare_ecoding
 from gatenlp import Document
+from collections import Counter
 
 def vector_encode(v):
     s = base64.b64encode(v).decode()
@@ -115,8 +116,41 @@ async def cluster_mention_from_doc(doc: dict = Body(...)):
             for men_id in cluster.mentions_id:
                 mention = all_mentions.get(men_id)
                 mention.features['cluster'] = cluster_id
+                # set title and url to mention
+                mention.features['title'] = cluster.get_title()
+                # TODO put URL of the cluster
+                mention.features['url'] = 'NIL{}'.format(cluster_id)
 
-        doc.features['clusters'][annset_name] = current_clusters
+        # add clusters of non NIL mentions # TODO WORKAROUND
+        not_nil_clusters = {}
+        for mention in doc.annset(annset_name):
+            if mention.features['is_nil']:
+                # skip
+                continue
+            else:
+                if mention.features['url'] not in not_nil_clusters:
+                    not_nil_clusters[mention.features['url']] = {
+                        'top_candidate': mention.features['linking']['top_candidate'],
+                        'title': mention.features['title'],
+                        'type': mention.features['linking']['top_candidate'].get('type'),
+                        'nelements': 0,
+                        'mentions': [],
+                        '_types': []
+                    }
+                not_nil_clusters[mention.features['url']]['mentions'].append({
+                    'id': mention.id, 'mention': mention.features.get('mention', doc.text[mention.start:mention.end])
+                })
+                not_nil_clusters[mention.features['url']]['nelements'] += 1
+                not_nil_clusters[mention.features['url']]['_types'].extend(list(set(list(mention.type) + mention.features.get('types', []))))
+                
+        for key, _clust in not_nil_clusters:
+            if not _clust['type']:
+                counter = Counter(_clust['_types'])
+                _clust['type'] = counter.most_common(1)[0][0]
+            del _clust['types']
+
+        doc.features['clusters'][annset_name] = current_clusters + list(not_nil_clusters.values)
+
 
     if not 'pipeline' in doc.features:
         doc.features['pipeline'] = []

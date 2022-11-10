@@ -305,5 +305,15 @@ def create_best_NER_annset(doc, annset_exclusion_list, best_ner_name, type_relat
   annset = doc.annset(best_ner_name)
 
   for ent in best_NER_list:
-    annset.add(ent.start, ent.end, ent.ann_type,{'text': ent.text})
+    feat_to_add = {
+      "types": [ent.ann_type],
+      "ner": {
+        "type": ent.ann_type,
+        "source": "mergener",
+        }}
+    if ent.ann_type == 'DATE':
+      feat_to_add['linking'] = {
+          "skip": True
+      }
+    annset.add(ent.start, ent.end, ent.ann_type, feat_to_add)
   return doc

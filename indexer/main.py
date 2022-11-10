@@ -173,8 +173,13 @@ def search_from_doc_topk(top_k, doc):
             mention.features['is_nil'] = True
         else:
             top_cand = cands[0]
+            # TODO here for backward compatibility
             mention.features['linking']['top_candidate'] = top_cand
             mention.features['linking']['candidates'] = cands
+            #
+            mention.features['title'] = top_cand['title']
+            mention.features['url'] = top_cand['url']
+            mention.features['additional_candidates'] = cands
 
     if not 'pipeline' in doc.features:
         doc.features['pipeline'] = []
