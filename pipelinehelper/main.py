@@ -146,7 +146,7 @@ def run(doc, doc_id = None):
         new_dict_to_save['annotation_sets'] = {}
         for annset_name, annset in dict_to_save['annotation_sets'].items():
             # if in rename --> rename; otherwise --> old annset_name
-            new_name = dict_to_save['features']['rename_set'].get(annset_name, annset_name)
+            new_name = dict_to_save['features'].get('rename_set', {}).get(annset_name, annset_name)
 
             annset['name'] = new_name
 
