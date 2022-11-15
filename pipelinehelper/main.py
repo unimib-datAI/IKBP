@@ -43,6 +43,14 @@ def run(doc, doc_id = None):
     if not 'pipeline' in doc.features:
         doc.features['pipeline'] = []
 
+    if 'sectionator' in doc.features['pipeline']:
+        print('Skipping sectionator: already done')
+    else:
+        res_ner = requests.post(args.sectionator, json=doc.to_dict())
+        if not res_ner.ok:
+            raise Exception('sectionator error')
+        doc = Document.from_dict(res_ner.json())
+
     if 'spacyner' in doc.features['pipeline']:
         print('Skipping spacyner: already done')
     else:
@@ -198,6 +206,9 @@ if __name__ == '__main__':
         "--api-baseurl", type=str, default=None, help="Baseurl to call all the APIs", dest='baseurl', required=True
     )
     parser.add_argument(
+        "--api-sectionator", type=str, default=None, help="sectionator URL", dest='sectionator', required=False
+    )
+    parser.add_argument(
         "--api-spacyner", type=str, default=None, help="spacyner URL", dest='spacyner', required=False
     )
     parser.add_argument(
@@ -239,6 +250,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    if args.sectionator is None:
+        args.sectionator = args.baseurl + '/api/sectionator'
     if args.spacyner is None:
         args.spacyner = args.baseurl + '/api/spacyner'
     if args.tintner is None:

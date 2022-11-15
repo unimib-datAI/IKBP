@@ -306,6 +306,7 @@ def create_best_NER_annset(doc, annset_exclusion_list, types_list, best_ner_name
 
   for ent in best_NER_list:
     feat_to_add = {
+      "mention": doc.text[ent.start:ent.end],
       "types": [ent.ann_type],
       "ner": {
         "type": ent.ann_type,

@@ -12,6 +12,9 @@ http:// {
 	handle /api/nilprediction* {
 		reverse_proxy nilpredictor:80
 	}
+	handle /api/sectionator* {
+		reverse_proxy sectionator:80
+	}
 	handle /api/spacyner* {
 		reverse_proxy spacyner:80
 	}

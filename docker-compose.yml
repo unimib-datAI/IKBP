@@ -132,6 +132,17 @@ services:
       PATH_TO_TYPE_RELATION_CSV: $MERGE_PATH_TO_TYPE_RELATION_CSV
       PATH_TO_ANNSET_PRIORITY: $MERGE_PATH_TO_ANNSET_PRIORITY
 
+  sectionator:
+    restart: $RESTART_POLICY
+    build:
+        context: ./sectionator
+        dockerfile: Dockerfile
+    volumes:
+      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - ./sectionator/main.py:/home/app/main.py
+    environment:
+      DISTRIBUZIONE_TERRITORIALE_UFFICI: $SECTIONATOR_DISTRIBUZIONE_TERRITORIALE_UFFICI
+
   pipeline:
     restart: $RESTART_POLICY
     build: pipelinehelper
