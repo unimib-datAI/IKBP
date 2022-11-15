@@ -77,10 +77,10 @@ class TrieNER:
                     'entities': entities
                 },
                 'linking': {
-                    'skip': len(entities == 1) # skip linking if certain: only 1 candidate
+                    'skip': len(entities) == 1 # skip linking if certain: only 1 candidate
                 },
-                'title': entities[0]['name'] if len(entities == 1) else '',
-                'url': 'TRIE{}'.format(entities[0]['id']) if len(entities == 1) else ''
+                'title': entities[0]['name'] if len(entities) == 1 else '',
+                'url': 'TRIE{}'.format(entities[0]['id']) if len(entities) == 1 else ''
             }
         }
     

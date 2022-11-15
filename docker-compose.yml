@@ -112,6 +112,7 @@ services:
     volumes:
       - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
       - ./trie-ner/main.py:/home/app/main.py
+      - ./trie-ner/TrieNER.py:/home/app/TrieNER.py
     environment:
       TRIE_NAME: $TRIE_NAME
       PATH_TO_SAVED_TRIES: $PATH_TO_SAVED_TRIES
