@@ -44,7 +44,7 @@ app = FastAPI()
 async def encode_mention_from_doc(doc: dict = Body(...)):
     doc = Document.from_dict(doc)
 
-    annsets_to_link = set(doc.features.get('annsets_to_link', 'entities_merged'))
+    annsets_to_link = set([doc.features.get('annsets_to_link', 'entities_merged')])
 
     samples = []
     mentions = []
@@ -77,7 +77,8 @@ async def encode_mention_from_doc(doc: dict = Body(...)):
         samples, biencoder.tokenizer, biencoder_params
     )
     encodings = _run_biencoder_mention(biencoder, dataloader)
-    assert encodings[0].dtype == 'float32'
+    if len(encodings) > 0:
+        assert encodings[0].dtype == 'float32'
     encodings = [vector_encode(e) for e in encodings]
 
     for mention, enc in zip(mentions, encodings):
@@ -99,7 +100,8 @@ async def encode_mention(samples: List[Mention]):
         samples, biencoder.tokenizer, biencoder_params
     )
     encodings = _run_biencoder_mention(biencoder, dataloader)
-    assert encodings[0].dtype == 'float32'
+    if len(encodings) > 0:
+        assert encodings[0].dtype == 'float32'
     #assert np.array_equal(encodings[0], vector_decode(vector_encode(encodings[0]), np.float32))
     ## dtype float32
     encodings = [vector_encode(e) for e in encodings]
@@ -122,7 +124,8 @@ async def encode_entity(samples: List[Entity]):
 
     encodings = _run_biencoder_entity(biencoder, dataloader)
 
-    assert encodings[0].dtype == 'float32'
+    if len(encodings) > 0:
+        assert encodings[0].dtype == 'float32'
     #assert np.array_equal(encodings[0], vector_decode(vector_encode(encodings[0]), np.float32))
     ## dtype float32
     encodings = [vector_encode(e) for e in encodings]

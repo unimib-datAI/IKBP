@@ -43,7 +43,7 @@ app = FastAPI()
 async def nilprediction_doc_api(doc: dict = Body(...)):
     doc = Document.from_dict(doc)
 
-    annsets_to_link = set(doc.features.get('annsets_to_link', 'entities_merged'))
+    annsets_to_link = set([doc.features.get('annsets_to_link', 'entities_merged')])
 
     input = []
     mentions = []

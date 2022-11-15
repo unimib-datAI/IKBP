@@ -77,7 +77,7 @@ app = FastAPI()
 async def cluster_mention_from_doc(doc: dict = Body(...)):
     doc = Document.from_dict(doc)
 
-    annsets_to_link = set(doc.features.get('annsets_to_link', 'entities_merged'))
+    annsets_to_link = set([doc.features.get('annsets_to_link', 'entities_merged')])
 
     if not 'clusters' in doc.features or not isinstance(doc.features['clusters'], dict):
         doc.features['clusters'] = {}
@@ -124,7 +124,7 @@ async def cluster_mention_from_doc(doc: dict = Body(...)):
         # add clusters of non NIL mentions # TODO WORKAROUND
         not_nil_clusters = {}
         for mention in doc.annset(annset_name):
-            if mention.features['is_nil']:
+            if mention.features['linking'].get('is_nil', False):
                 # skip
                 continue
             else:
@@ -143,14 +143,19 @@ async def cluster_mention_from_doc(doc: dict = Body(...)):
                 })
                 not_nil_clusters[mention.features['url']]['nelements'] += 1
                 not_nil_clusters[mention.features['url']]['_types'].extend(list(set(list(mention.type) + mention.features.get('types', []))))
-                
-        for key, _clust in not_nil_clusters:
-            if not _clust['type']:
+
+        for key, _clust in not_nil_clusters.items():
+            if not _clust.get('type'):
                 counter = Counter(_clust['_types'])
                 _clust['type'] = counter.most_common(1)[0][0]
-            del _clust['types']
+            del _clust['_types']
 
-        doc.features['clusters'][annset_name] = current_clusters + list(not_nil_clusters.values)
+        next_clust_id = max(i['id'] for i in current_clusters) + 1
+        for k,c in not_nil_clusters.items():
+            c['id'] = next_clust_id
+            next_clust_id += 1
+
+        doc.features['clusters'][annset_name] = current_clusters + list(not_nil_clusters.values())
 
 
     if not 'pipeline' in doc.features:
