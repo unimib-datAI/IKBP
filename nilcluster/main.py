@@ -127,6 +127,9 @@ async def cluster_mention_from_doc(doc: dict = Body(...)):
             if mention.features['linking'].get('is_nil', False):
                 # skip
                 continue
+            if not mention.features.get('url'):
+                # skip mentions without url (e.g dates)
+                continue
             else:
                 if mention.features['url'] not in not_nil_clusters:
                     not_nil_clusters[mention.features['url']] = {
