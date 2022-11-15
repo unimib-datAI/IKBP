@@ -114,6 +114,14 @@ export default (app) => {
       delete document['_id'];
       delete document['__v'];
       delete document['id'];
+      if ('features' in document) {
+        if ('save' in document['features']) {
+          delete document['features']['save'];
+        }
+        if ('reannotate' in document['features']) {
+          delete document['features']['reannotate'];
+        }
+      }
     }
 
     if (!clusters && document.features && document.features.clusters) {
