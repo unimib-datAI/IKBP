@@ -74,7 +74,7 @@ def get_root_type(ann, annset, type_relation_df):
 
 
 
-def preprocess_annset(doc, annset_exclusion_list, type_relation_df):
+def preprocess_annset(doc, annset_exclusion_list, types_list, type_relation_df):
   # selected annset
   selected_annset_names = [annset_name for annset_name in doc.annset_names() if annset_name not in annset_exclusion_list]
 
@@ -90,7 +90,7 @@ def preprocess_annset(doc, annset_exclusion_list, type_relation_df):
             doc.text[ann.start:ann.end],
             source = annset_name
             )
-        for ann in doc.anns(annset_name)]
+        for ann in doc.anns(annset_name) if ann.type in types_list]
     myannotation_list.extend(myannotation_temp_list)
   ordered_myannotation_list = [annotation for annotation in sorted(myannotation_list, key=lambda ann: (ann.start, ann.end, ann.ann_type))]
   return ordered_myannotation_list
@@ -290,8 +290,8 @@ def reduce_partial_overlaps(partial_overlaps, best_ner_name, annset_priority, ma
 
   return cleaned_partial_overlap_list
 
-def create_best_NER_annset(doc, annset_exclusion_list, best_ner_name, type_relation_df, annset_priority, maximum_per_parts, maximum_parts):
-  ordered_myannotation_list = preprocess_annset(doc, annset_exclusion_list, type_relation_df)
+def create_best_NER_annset(doc, annset_exclusion_list, types_list, best_ner_name, type_relation_df, annset_priority, maximum_per_parts, maximum_parts):
+  ordered_myannotation_list = preprocess_annset(doc, annset_exclusion_list, types_list, type_relation_df)
   partial_overlaps, overlaps, disjoints = analyze_overlap(ordered_myannotation_list)
   best_NER_list = []
   best_NER_list.extend(reduce_disjoints(disjoints, best_ner_name))

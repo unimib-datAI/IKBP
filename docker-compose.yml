@@ -127,8 +127,9 @@ services:
       - ./merge-annotation-sets/build_type_relation_df.py:/home/app/build_type_relation_df.py
       - ./merge-annotation-sets/merge_sets.py:/home/app/merge_sets.py
     environment:
-      PATH_TO_TYPE_RELATION_CSV: /home/app/models/mergener/type_relation_df.csv
-      PATH_TO_ANNSET_PRIORITY: /home/app/models/mergener/annset_priority.json
+      PATH_TO_TYPES: $MERGE_PATH_TO_TYPES
+      PATH_TO_TYPE_RELATION_CSV: $MERGE_PATH_TO_TYPE_RELATION_CSV
+      PATH_TO_ANNSET_PRIORITY: $MERGE_PATH_TO_ANNSET_PRIORITY
 
   pipeline:
     restart: $RESTART_POLICY

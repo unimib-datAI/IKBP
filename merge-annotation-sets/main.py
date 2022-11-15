@@ -49,10 +49,11 @@ def run(body: Input):
   merged_name = body.merged_name
   annset_priority = get_annset_priority(doc, body.annset_priority)
   exclusion_list = get_annset_exclusion_list(doc, annset_priority)
+  types_list = types_set
   doc = Document.from_dict(doc)
   annset_name = 'entities_' + merged_name
   
-  doc = create_best_NER_annset(doc, exclusion_list, annset_name, type_relation_df, annset_priority, MAXIMUM_PER_PARTS, MAXIMUM_PARTS)
+  doc = create_best_NER_annset(doc, exclusion_list, types_list, annset_name, type_relation_df, annset_priority, MAXIMUM_PER_PARTS, MAXIMUM_PARTS)
 
   return doc.to_dict()
 
@@ -67,6 +68,9 @@ if __name__ == '__main__':
         "--port", type=int, default="30310", help="port to listen at",
     )
     parser.add_argument(
+        "--path-to-types", type=str, default=None, dest='path_to_types', help="Path to types list",
+    )
+    parser.add_argument(
         "--path-to-type-relation-csv", type=str, default=None, dest='path_to_type_relation_csv', help="Path to type realtion csv",
     )
     parser.add_argument(
@@ -79,6 +83,9 @@ if __name__ == '__main__':
         args.path_to_type_relation_csv = './data/type_relation_df.csv'
     
     type_relation_df = pd.read_csv(args.path_to_type_relation_csv)
+
+    types_list_df = pd.read_csv(args.path_to_types)
+    types_set = set(types_list_df['type'])
 
     if args.path_to_annset_priotity:
         with open(args.path_to_annset_priotity, 'r') as fd:
