@@ -145,7 +145,7 @@ async def cluster_mention_from_doc(doc: dict = Body(...)):
                     'id': mention.id, 'mention': mention.features.get('mention', doc.text[mention.start:mention.end])
                 })
                 not_nil_clusters[mention.features['url']]['nelements'] += 1
-                not_nil_clusters[mention.features['url']]['_types'].extend(list(set(list(mention.type) + mention.features.get('types', []))))
+                not_nil_clusters[mention.features['url']]['_types'].extend(list(set([mention.type] + mention.features.get('types', []))))
 
         for key, _clust in not_nil_clusters.items():
             if not _clust.get('type'):
