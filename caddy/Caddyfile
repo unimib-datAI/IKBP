@@ -15,6 +15,9 @@ http:// {
 	handle /api/sectionator* {
 		reverse_proxy sectionator:80
 	}
+	handle /api/specialization* {
+		reverse_proxy specialization:80
+	}
 	handle /api/spacyner* {
 		reverse_proxy spacyner:80
 	}

@@ -4,22 +4,30 @@ import uvicorn
 from gatenlp import Document
 from fakeCandidates import fake_candidates
 import requests
+from pydantic import BaseModel
+from typing import List
 
 import os
 from dotenv import load_dotenv
 
-load_dotenv('../.env')
+load_dotenv()
 
 PIPELINE_ADDRESS = os.getenv('PIPELINE_ADDRESS')
 API_GET_DOCUMENT = '/api/mongo/document'
 
+class SpecialInput(BaseModel):
+    type_id: str
+
+class VerbalInput(BaseModel):
+    type_id: str
+    verbalizer: List[str]
 
 app = FastAPI()
 
 # NOTE: serve solo per la demo
-@app.get('/api/specialization/few-shot-examples')
-async def get_few_shot_examples(type_info: dict = Body(...)):
-    type_id = type_info['key']
+@app.post('/api/specialization/few')
+async def get_few(body: SpecialInput):
+    type_id = body.type_id
     annotation_set = 'PoC_test_fewshot'
     # get all documents
     documents = requests.get(f'{API_GET_DOCUMENT}?limit=9999').json()['docs']
@@ -38,10 +46,10 @@ async def get_few_shot_examples(type_info: dict = Body(...)):
     examples = fake_candidates
     return examples
 
-@app.get('/api/specialization/zero-shot-candidates')
-async def get_zero_shot_candidates(type_info: dict = Body(...)):
-    type_id = type_info['key']
-    verbalizer = type_info['verbalizer']
+@app.post('/api/specialization/zero')
+async def get_zero(body: VerbalInput):
+    type_id = body.type_id
+    verbalizer = body.verbalizer
     print(type_id)
     print(verbalizer)
 
