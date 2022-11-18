@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 PIPELINE_ADDRESS = os.getenv('PIPELINE_ADDRESS')
-API_GET_DOCUMENT = '/api/mongo/document'
+API_GET_DOCUMENT = f'{PIPELINE_ADDRESS}/api/mongo/document'
 
 class SpecialInput(BaseModel):
     type_id: str
@@ -57,8 +57,6 @@ async def get_zero(body: VerbalInput):
     # TODO: metodo riccardo che usa modello istanziato e ritorna i candidati nel formato corretto
     candidates = fake_candidates
     return candidates
-
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
