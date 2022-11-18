@@ -154,6 +154,7 @@ services:
       - ./specialization/fakeCandidates.py:/home/app/fakeCandidates.py
     environment:
       PIPELINE_ADDRESS: $PIPELINE_ADDRESS
+      # command: sleep 7200
 
   pipeline:
     restart: $RESTART_POLICY
