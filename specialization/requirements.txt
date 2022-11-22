@@ -1,6 +1,12 @@
 fastapi
 uvicorn
 gatenlp
-pandas
 python-dotenv
 requests
+torch==1.12.1
+gatenlp==1.0.7
+transformers==4.22.2
+numpy==1.23.3
+pandas==1.5.0
+torch==1.12.1
+imbalanced-learn==0.9.1
