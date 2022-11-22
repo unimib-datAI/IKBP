@@ -5,6 +5,17 @@ import fetch from 'node-fetch';
 
 const server = Fastify({ logger: true })
 
+const getIsNil = (ann) => {
+  if (ann.features.is_nil === undefined) {
+    if (ann.features.linking && ann.features.is_nil !== undefined) {
+      return ann.features.is_nil;
+    }
+  }
+
+  return false;
+}
+
+
 const processAnnotations = (text, annotations = []) => {
   return annotations.map((ann) => {
     const { type } = ann.features.ner;
@@ -13,6 +24,7 @@ const processAnnotations = (text, annotations = []) => {
       type,
       features: {
         ...ann.features,
+        is_nil: getIsNil(),
         mention: text.slice(ann.start, ann.end)
       }
     }
