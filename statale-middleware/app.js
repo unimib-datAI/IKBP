@@ -7,14 +7,13 @@ const server = Fastify({ logger: true })
 
 const getIsNil = (ann) => {
   if (ann.features.is_nil === undefined) {
-    if (ann.features.linking && ann.features.is_nil !== undefined) {
-      return ann.features.is_nil;
+    if (ann.features.linking && ann.features.linking.is_nil !== undefined) {
+      return ann.features.linking.is_nil;
     }
   }
 
   return false;
 }
-
 
 const processAnnotations = (text, annotations = []) => {
   return annotations.map((ann) => {
@@ -77,7 +76,7 @@ server.get('/mongo/document/:id', async (request, reply) => {
 // Run the server!
 const start = async () => {
   try {
-    await server.listen({ port: 3002 })
+    await server.listen({ port: 3002, host: '0.0.0.0' })
   } catch (err) {
     server.log.error(err)
     process.exit(1)

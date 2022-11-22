@@ -1,156 +1,163 @@
 version: "3"
 services:
+  #  tint:
+  #    restart: $RESTART_POLICY
+  #    image: rpozzi/tint
+  #    # build:
+  #    #   context: tint
+  #    #   dockerfile: Dockerfile
+  #
+  #  postgres:
+  #    restart: $RESTART_POLICY
+  #    image: postgres:14
+  #    environment:
+  #      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+  #    volumes:
+  #      - ./postgres/data:/var/lib/postgresql/data
+  #      - "./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql"
+  #
+  #  mongo:
+  #    restart: $RESTART_POLICY
+  #    image: mongo:4.4.6 # mongo 5 requires cpu supports AVX
+  #    environment:
+  #      MONGO_INITDB_ROOT_USERNAME: root
+  #      MONGO_INITDB_ROOT_PASSWORD: $MONGO_ROOT_PASSWORD
+  #      MONGO_INITDB_DATABASE: main
+  #      MONGO_INITDB_USERNAME: usr
+  #      MONGO_INITDB_PASSWORD: $MONGO_PASSWORD
+  #    volumes:
+  #      - ./mongo/data:/data/db
+  #      - ./mongo/initdb.d:/docker-entrypoint-initdb.d/
+  #
+  #  documents:
+  #    restart: $RESTART_POLICY
+  #    build: documents
+  #    environment:
+  #      PORT: 3001
+  #      ENABLE_AUTH: false
+  #      MONGO: mongodb://usr:$MONGO_PASSWORD@mongo:27017/main
+  #
+  #  biencoder:
+  #    restart: $RESTART_POLICY
+  #    #image: rpozzi/blink_biencoder
+  #    build:
+  #      context: ./biencoder
+  #      dockerfile: Dockerfile
+  #    volumes:
+  #      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+  #    environment:
+  #      PYTHONPATH: /home/app
+  #      BIENCODER_MODEL: $BIENCODER_MODEL
+  #      BIENCODER_CONFIG: $BIENCODER_CONFIG
+  #    deploy:
+  #      resources:
+  #        reservations:
+  #          devices:
+  #            - capabilities: [ gpu ]
+  #    # command: python main.py --host 0.0.0.0 --port 80 --biencoder_model $BIENCODER_MODEL --biencoder_config $BIENCODER_CONFIG
+  #
+  #  indexer:
+  #    restart: $RESTART_POLICY
+  #    # image: rpozzi/blink_indexer
+  #    build:
+  #        context: ./indexer
+  #        dockerfile: Dockerfile
+  #    volumes:
+  #      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+  #    environment:
+  #      INDEXER_INDEX: $INDEXER_INDEX
+  #      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+  #      INDEXER_VECTOR_SIZE: $INDEXER_VECTOR_SIZE
+  #      INDEXER_LANGUAGE: $INDEXER_LANGUAGE
+  #    depends_on:
+  #      - postgres
+  #    # command: python main.py --host 0.0.0.0 --port 80 --index $INDEXER_INDEX --postgres postgres://postgres:$POSTGRES_PASSWORD@postgres:5432/postgres --vector-size $INDEXER_VECTOR_SIZE --language $INDEXER_LANGUAGE
+  #
+  #  nilcluster:
+  #    restart: $RESTART_POLICY
+  #    #image: rpozzi/blink_nilcluster
+  #    build:
+  #        context: ./nilcluster
+  #        dockerfile: Dockerfile
+  #    # command: python main.py --host 0.0.0.0 --port 80
+  #
+  #  nilpredictor:
+  #    restart: $RESTART_POLICY
+  #    #image: rpozzi/blink_nilpredictor
+  #    build:
+  #        context: ./nilpredictor
+  #        dockerfile: Dockerfile
+  #    volumes:
+  #      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+  #    environment:
+  #      NILPREDICTOR_ARGS: $NILPREDICTOR_ARGS
+  #    # command: python main.py --host 0.0.0.0 --port 80 $NILPREDICTOR_ARGS
+  #
+  #  triener:
+  #    restart: $RESTART_POLICY
+  #    build:
+  #        context: ./trie-ner
+  #        dockerfile: Dockerfile
+  #    volumes:
+  #      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+  #    environment:
+  #      TRIE_NAME: $TRIE_NAME
+  #      PATH_TO_SAVED_TRIES: $PATH_TO_SAVED_TRIES
+  #
+  #  mergener:
+  #    restart: $RESTART_POLICY
+  #    build:
+  #        context: ./merge-annotation-sets
+  #        dockerfile: Dockerfile
+  #    volumes:
+  #      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+  #    environment:
+  #      PATH_TO_TYPE_RELATION_CSV: /home/app/models/mergener/type_relation_df.csv
+  #
+  #  pipeline:
+  #    restart: $RESTART_POLICY
+  #    build: pipelinehelper
+  #    environment:
+  #      PIPELINE_ARGS: $PIPELINE_ARGS
+  #
+  #  spacyner:
+  #    restart: $RESTART_POLICY
+  #    build: ./spacyner
+  #    environment:
+  #      SPACY_MODEL: $SPACY_MODEL
+  #      SPACY_TAG: $SPACY_TAG
+  #    volumes:
+  #      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+  #    deploy:
+  #      resources:
+  #        reservations:
+  #          devices:
+  #            - capabilities: [ gpu ]
+  #    # command: python __main__.py --host 0.0.0.0 --port 80 --model $SPACY_MODEL --tint http://tint:8012/tint
+  #
+  #  tintner:
+  #    restart: $RESTART_POLICY
+  #    build: ./tintner
+  #    # command: python __main__.py --host 0.0.0.0 --port 80 --model $SPACY_MODEL --tint http://tint:8012/tint
+  #
+  #  caddy:
+  #    restart: $RESTART_POLICY
+  #    image: caddy:2
+  #    ports:
+  #      - "$CADDY_LISTEN_HTTP:80"
+  #    volumes:
+  #      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+  #      - ./caddy/site:/srv
+  #      - ./caddy/data:/data
+  #      - ./caddy/config:/config
 
-  tint:
+  statalemiddleware:
     restart: $RESTART_POLICY
-    image: rpozzi/tint
-    # build:
-    #   context: tint
-    #   dockerfile: Dockerfile
-
-  postgres:
-    restart: $RESTART_POLICY
-    image: postgres:14
-    environment:
-      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
-    volumes:
-      - ./postgres/data:/var/lib/postgresql/data
-      - "./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql"
-
-  mongo:
-    restart: $RESTART_POLICY
-    image: mongo:4.4.6 # mongo 5 requires cpu supports AVX
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: $MONGO_ROOT_PASSWORD
-      MONGO_INITDB_DATABASE: main
-      MONGO_INITDB_USERNAME: usr
-      MONGO_INITDB_PASSWORD: $MONGO_PASSWORD
-    volumes:
-      - ./mongo/data:/data/db
-      - ./mongo/initdb.d:/docker-entrypoint-initdb.d/
-
-  documents:
-    restart: $RESTART_POLICY
-    build: documents
-    environment:
-      PORT: 3001
-      ENABLE_AUTH: false
-      MONGO: mongodb://usr:$MONGO_PASSWORD@mongo:27017/main
-
-  biencoder:
-    restart: $RESTART_POLICY
-    #image: rpozzi/blink_biencoder
-    build:
-      context: ./biencoder
-      dockerfile: Dockerfile
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-    environment:
-      PYTHONPATH: /home/app
-      BIENCODER_MODEL: $BIENCODER_MODEL
-      BIENCODER_CONFIG: $BIENCODER_CONFIG
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [ gpu ]
-    # command: python main.py --host 0.0.0.0 --port 80 --biencoder_model $BIENCODER_MODEL --biencoder_config $BIENCODER_CONFIG
-
-  indexer:
-    restart: $RESTART_POLICY
-    # image: rpozzi/blink_indexer
-    build:
-        context: ./indexer
-        dockerfile: Dockerfile
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-    environment:
-      INDEXER_INDEX: $INDEXER_INDEX
-      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
-      INDEXER_VECTOR_SIZE: $INDEXER_VECTOR_SIZE
-      INDEXER_LANGUAGE: $INDEXER_LANGUAGE
-    depends_on:
-      - postgres
-    # command: python main.py --host 0.0.0.0 --port 80 --index $INDEXER_INDEX --postgres postgres://postgres:$POSTGRES_PASSWORD@postgres:5432/postgres --vector-size $INDEXER_VECTOR_SIZE --language $INDEXER_LANGUAGE
-
-  nilcluster:
-    restart: $RESTART_POLICY
-    #image: rpozzi/blink_nilcluster
-    build:
-        context: ./nilcluster
-        dockerfile: Dockerfile
-    # command: python main.py --host 0.0.0.0 --port 80
-
-  nilpredictor:
-    restart: $RESTART_POLICY
-    #image: rpozzi/blink_nilpredictor
-    build:
-        context: ./nilpredictor
-        dockerfile: Dockerfile
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-    environment:
-      NILPREDICTOR_ARGS: $NILPREDICTOR_ARGS
-    # command: python main.py --host 0.0.0.0 --port 80 $NILPREDICTOR_ARGS
-
-  triener:
-    restart: $RESTART_POLICY
-    build:
-        context: ./trie-ner
-        dockerfile: Dockerfile
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-    environment:
-      TRIE_NAME: $TRIE_NAME
-      PATH_TO_SAVED_TRIES: $PATH_TO_SAVED_TRIES
-
-  mergener:
-    restart: $RESTART_POLICY
-    build:
-        context: ./merge-annotation-sets
-        dockerfile: Dockerfile
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-    environment:
-      PATH_TO_TYPE_RELATION_CSV: /home/app/models/mergener/type_relation_df.csv
-
-  pipeline:
-    restart: $RESTART_POLICY
-    build: pipelinehelper
-    environment:
-      PIPELINE_ARGS: $PIPELINE_ARGS
-
-  spacyner:
-    restart: $RESTART_POLICY
-    build: ./spacyner
-    environment:
-      SPACY_MODEL: $SPACY_MODEL
-      SPACY_TAG: $SPACY_TAG
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [ gpu ]
-    # command: python __main__.py --host 0.0.0.0 --port 80 --model $SPACY_MODEL --tint http://tint:8012/tint
-
-  tintner:
-    restart: $RESTART_POLICY
-    build: ./tintner
-    # command: python __main__.py --host 0.0.0.0 --port 80 --model $SPACY_MODEL --tint http://tint:8012/tint
-
-  caddy:
-    restart: $RESTART_POLICY
-    image: caddy:2
+    build: statale-middleware
     ports:
-      - "$CADDY_LISTEN_HTTP:80"
-    volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
-      - ./caddy/site:/srv
-      - ./caddy/data:/data
-      - ./caddy/config:/config
+      - 49160:3002
+    environment:
+      API_STATALE: $API_STATALE
 
   ui:
     restart: $RESTART_POLICY
@@ -159,9 +166,11 @@ services:
       args:
         ACCESS_USERNAME: $UI_ACCESS_USERNAME
         ACCESS_PASSWORD: $UI_ACCESS_PASSWORD
-        API_BASE_URI: ${PIPELINE_ADDRESS}/api
+        API_BASE_URI: $UI_API_BASE_URI
         API_USERNAME: ""
         API_PASSWORD: ""
+        NO_LOGIN: $UI_NO_LOGIN
+        STATALE_MODE: $UI_STATALE_MODE
         NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
         NEXTAUTH_URL: $UI_NEXTAUTH_URL
         NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
@@ -171,9 +180,11 @@ services:
     environment:
       ACCESS_USERNAME: $UI_ACCESS_USERNAME
       ACCESS_PASSWORD: $UI_ACCESS_PASSWORD
-      API_BASE_URI: ${PIPELINE_ADDRESS}/api
+      API_BASE_URI: $UI_API_BASE_URI
       API_USERNAME: ""
       API_PASSWORD: ""
+      NO_LOGIN: $UI_NO_LOGIN
+      STATALE_MODE: $UI_STATALE_MODE
       NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
       NEXTAUTH_URL: $UI_NEXTAUTH_URL
       NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
