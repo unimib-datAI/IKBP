@@ -38,58 +38,60 @@ def get_annotated_example(doc, annotation_set, type_id, span=50, doc_id=None):
     labels: a list with typing labels in document
     '''
     # get text
-    text = doc.text
+    text = doc['text']
     # iterate over annotation
     example_list = [] # save example here
     labels = [] # save unique labels
-    for ann in doc.annset(annotation_set):
-        mention = ann.features['mention'].replace('\n', ' ') # get mention
-        mention_type = ann.type # get label
+
+    for ann in doc['annotation_sets'][annotation_set]['annotations']:
+        mention = ann['features']['mention'].replace('\n', ' ') # get mention
+        mention_type = ann['type'] # get label
         other_types = []
-        if 'types' in ann.features:
-            other_types = ann.features['types']
+        if 'types' in ann['features']:
+            other_types = ann['features']['types']
         if mention_type not in labels:
             labels.append(mention_type)
-        mention_start = ann.start
-        mention_end = ann.end
-        # get context
-        context_start = np.where(mention_start-span>= 0, mention_start-span, 0)
-        context_end = np.where(mention_end+span <= len(text), mention_end+span, len(text))
-        context = text[context_start:context_end]
-        context = context.replace('\n', ' ') # del usless \n
-        # crop first and last word cause they could be truncated
-        # only if the mention isn't at the beginning or at the end of the doc
-        if mention_start != 0 and mention_end != len(text):
-            first_space = context.find(' ')
-            last_space = context.rfind(' ')
-            context_clean = context[first_space+1:last_space]
-            context_start = int(context_start + first_space+1)
-            context_end = context_start + len(context_clean)
-        # mention at the beginning of doc
-        elif mention_start == 0 and mention_end != len(text):
-            first_space = -1
-            last_space = context.rfind(' ')
-            context_clean = context[first_space+1:last_space]
-            context_start = int(context_start + first_space+1)
-            context_end = context_start + len(context_clean)
-        # mention at the end of doc
-        elif mention_start != 0 and mention_end == len(text):
-            first_space = context.find(' ')
-            last_space = len(context) + 1
-            context_clean = context[first_space+1:last_space]
-            context_start = int(context_start + first_space+1)
-            context_end = context_start + len(context_clean)       
-            
-        # save in a dictionary
-        all_types = set.union(set(mention_type), set(other_types))
+
+        # keep only useful annotations
+        all_types = set.union(set([mention_type]), set(other_types))
         if type_id in all_types:
+            mention_start = ann['start']
+            mention_end = ann['end']
+            # get context
+            context_start = np.where(mention_start-span>= 0, mention_start-span, 0)
+            context_end = np.where(mention_end+span <= len(text), mention_end+span, len(text))
+            context = text[context_start:context_end]
+            context = context.replace('\n', ' ') # del usless \n
+            # crop first and last word cause they could be truncated
+            # only if the mention isn't at the beginning or at the end of the doc
+            if mention_start != 0 and mention_end != len(text):
+                first_space = context.find(' ')
+                last_space = context.rfind(' ')
+                context_clean = context[first_space+1:last_space]
+                context_start = int(context_start + first_space+1)
+                context_end = context_start + len(context_clean)
+            # mention at the beginning of doc
+            elif mention_start == 0 and mention_end != len(text):
+                first_space = -1
+                last_space = context.rfind(' ')
+                context_clean = context[first_space+1:last_space]
+                context_start = int(context_start + first_space+1)
+                context_end = context_start + len(context_clean)
+            # mention at the end of doc
+            elif mention_start != 0 and mention_end == len(text):
+                first_space = context.find(' ')
+                last_space = len(context) + 1
+                context_clean = context[first_space+1:last_space]
+                context_start = int(context_start + first_space+1)
+                context_end = context_start + len(context_clean)       
+                
+            # save in a dictionary
             example = {'mention':mention, 'mention_type':type_id, 'text':context_clean, 
                     'offset_doc_start':mention_start, 'offset_doc_end':mention_end, 
                     'offset_ex_start':mention_start-context_start,
                     'offset_ex_end':mention_start-context_start+len(mention),
-                    'doc_id': doc_id, 'id':ann.id}
+                    'doc_id': doc_id, 'id':ann['id']}
             example_list.append(example)
-        
     return (example_list, labels)
 
 
@@ -97,7 +99,11 @@ def get_annotated_example(doc, annotation_set, type_id, span=50, doc_id=None):
 class Prompting(object):
     def __init__(self, model_name):
         # define model and tokenizer from HF
-        self.model = AutoModelForMaskedLM.from_pretrained(model_name)
+        # self.model = AutoModelForMaskedLM.from_pretrained(model_name).cuda()
+        self.model = AutoModelForMaskedLM.from_pretrained(model_name).cuda()
+        # if torch.cuda.is_available():
+        #     print('Using cuda')
+        #     self.model = self.model.cuda()
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     def prompt_prediction(self, ann_example, template, softmax=False):
@@ -123,7 +129,7 @@ class Prompting(object):
         # predict masked token
         self.model.eval()
         with torch.no_grad():
-            outputs = self.model(indexed_tokens)
+            outputs = self.model(indexed_tokens.cuda())
             predictions = outputs[0]
         mask_pred = predictions[0, mask_pos]
         if softmax:
@@ -142,7 +148,11 @@ class Prompting(object):
         X:  2D torch tensor with predictions for the [MASK] token
         '''
         X = [self.prompt_prediction(example, template, softmax=softmax) for example in examples]
-        X = torch.stack(X, dim=0)
+        try:
+            X = torch.stack(X, dim=0)
+        except:
+            pass
+
         return X        
 
 def verbalizer_to_index(verbalizer, tokenizer):
@@ -183,7 +193,7 @@ class VanillaClf(object):
         if logits:
             X_filter = torch.nn.functional.softmax(X_filter, dim=1)
         # convert to pandas df
-        X_filter_df = pd.DataFrame(X_filter.numpy())
+        X_filter_df = pd.DataFrame(X_filter.cpu().numpy())
         # verbalizer token as columns names
         verb_name = list(itertools.chain(*verbalizer.values()))
         X_filter_df.columns = verb_name

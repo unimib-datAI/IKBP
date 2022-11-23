@@ -150,11 +150,18 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      # - ./specialization/venv:/home/app/venv
       - ./specialization/main.py:/home/app/main.py
+      - ./specialization/utils_prompt.py:/home/app/utils_prompt.py
       - ./specialization/fakeCandidates.py:/home/app/fakeCandidates.py
     environment:
       PIPELINE_ADDRESS: $PIPELINE_ADDRESS
       # command: sleep 7200
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [ gpu ]
 
   pipeline:
     restart: $RESTART_POLICY

@@ -5,5 +5,6 @@ VERBALIZER = {
 
 ANCESTOR_MAP = {
   'TRIBUNALE' : 'ORG',
-  'JDG' : 'PER'
+  'JDG' : 'PER',
+  'AVT' : 'PER'
 }
