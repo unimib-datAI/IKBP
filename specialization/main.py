@@ -26,6 +26,7 @@ class FewShotInput(BaseModel):
     type_id: str
 
 class ZeroShotInput(BaseModel):
+    ancestor_type_id: str
     type_id: str
     verbalizer: List[str]
 
@@ -62,7 +63,7 @@ async def get_few(body: FewShotInput):
 async def get_zero(body: ZeroShotInput):
     print('ZEROSHOT API CALLED')
     type_id = body.type_id
-    original_type = ANCESTOR_MAP[type_id]
+    original_type = body.ancestor_type_id # ANCESTOR_MAP[type_id]
     verbalizer = body.verbalizer
     
     # get all documents

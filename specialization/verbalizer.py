@@ -1,6 +1,7 @@
 VERBALIZER = {
   'PER' : ['persona', 'uomo', 'individuo', 'soggetto'],
-  'ORG' : ['organizzazione', 'ente', 'azienda', 'società', 'istituto']
+  'ORG' : ['organizzazione', 'ente', 'azienda', 'società', 'istituto'],
+  'LOC' : ['luogo', 'posto', 'punto', 'zona', 'area']
 }
 
 ANCESTOR_MAP = {
