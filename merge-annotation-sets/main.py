@@ -74,7 +74,7 @@ if __name__ == '__main__':
         "--path-to-type-relation-csv", type=str, default=None, dest='path_to_type_relation_csv', help="Path to type realtion csv",
     )
     parser.add_argument(
-        "--path-to-annset-priority", type=str, default=None, dest='path_to_annset_priotity', help="Path to annset priotity (JSON list of wildcards)",
+        "--path-to-annset-priority", type=str, default=None, dest='path_to_annset_priority', help="Path to annset priotity (JSON list of wildcards)",
     )
 
     args = parser.parse_args()
@@ -87,8 +87,8 @@ if __name__ == '__main__':
     types_list_df = pd.read_csv(args.path_to_types)
     types_set = set(types_list_df['type'])
 
-    if args.path_to_annset_priotity:
-        with open(args.path_to_annset_priotity, 'r') as fd:
+    if args.path_to_annset_priority:
+        with open(args.path_to_annset_priority, 'r') as fd:
             annset_priority_g = json.load(fd)
     else:
         annset_priority_g = None
