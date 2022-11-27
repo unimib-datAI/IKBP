@@ -34,7 +34,10 @@ class TrieNER:
         result = []
         for i in range(1, len(items) + 1):
             for comb in itertools.permutations(items, i):
-                result.append(' '.join(comb))
+                to_append = ' '.join(comb)
+                if len(to_append) > 1:
+                    # avoid adding single letter patterns: too confusing
+                    result.append(to_append)
         return result
     
     def __add_entity(self, key, entity_type, entity_id):
