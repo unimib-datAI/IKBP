@@ -30,4 +30,4 @@ MERGE_PATH_TO_TYPES=/home/app/models/mergener/types.csv
 MERGE_PATH_TO_TYPE_RELATION_CSV=/home/app/models/mergener/type_relation_df.csv
 MERGE_PATH_TO_ANNSET_PRIORITY=/home/app/models/mergener/annset_priority.json
 SECTIONATOR_DISTRIBUZIONE_TERRITORIALE_UFFICI=/home/app/models/sectionator/distribuzione_territoriale_uffici.csv
-
+POSTPROCESS_TYPES_MAPPING=mapping.json

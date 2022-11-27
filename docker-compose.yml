@@ -115,6 +115,18 @@ services:
       PIPELINE_ADDRESS: $PIPELINE_ADDRESS
       # command: sleep 7200
 
+  postprocess:
+    restart: $RESTART_POLICY
+    build:
+      context: ./postprocess
+      dockerfile: Dockerfile
+    volumes:
+      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - ./postprocess/main.py:/home/app/main.py
+    environment:
+      TYPES_MAPPING: $POSTPROCESS_TYPES_MAPPING
+    # command: sleep 7200
+
   pipeline:
     restart: $RESTART_POLICY
     build: pipelinehelper
@@ -160,3 +172,6 @@ services:
       NEXTAUTH_URL: $UI_NEXTAUTH_URL
       NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
       NEXT_PUBLIC_FULL_PATH: $UI_NEXT_PUBLIC_FULL_PATH
+    volumes:
+      - ./giustizia-ui/modules:/app/modules
+        #command: sleep 7200

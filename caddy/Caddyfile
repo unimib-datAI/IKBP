@@ -27,6 +27,9 @@ http:// {
 	handle /api/nilcluster* {
 		reverse_proxy nilcluster:80
 	}
+	handle /api/postprocess* {
+		reverse_proxy postprocess:80
+	}
 	handle /api/pipeline* {
 		reverse_proxy pipeline:80
 	}

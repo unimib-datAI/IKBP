@@ -132,6 +132,14 @@ def run(doc, doc_id = None):
             raise Exception('Clustering error')
         doc = Document.from_dict(res_clustering.json())
 
+    if 'postprocess' in doc.features['pipeline']:
+        print('Skipping postprocess: already done')
+    else:
+        res_postprocess = requests.post(args.postprocess, json=doc.to_dict())
+        if not res_postprocess.ok:
+            raise Exception('postprocess error')
+        doc = Document.from_dict(res_postprocess.json())
+
     if doc.features.get('populate', False):
         # get clusters
         res_populate = requests.post(args.indexer_add, json=doc.to_dict())
@@ -245,6 +253,9 @@ if __name__ == '__main__':
         "--api-nilcluster", type=str, default=None, help="nilcluster URL", dest='nilcluster', required=False
     )
     parser.add_argument(
+        "--api-postprocess", type=str, default=None, help="postprocess URL", dest='postprocess', required=False
+    )
+    parser.add_argument(
         "--api-mongo", type=str, default=None, help="mongo URL", dest='mongo', required=False
     )
 
@@ -276,6 +287,8 @@ if __name__ == '__main__':
         args.nilpredictor = args.baseurl + '/api/nilprediction/doc'
     if args.nilcluster is None:
         args.nilcluster = args.baseurl + '/api/nilcluster/doc'
+    if args.postprocess is None:
+        args.postprocess = args.baseurl + '/api/postprocess/doc'
     if args.mongo is None:
         args.mongo = args.baseurl + '/api/mongo'
 
