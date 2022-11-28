@@ -2,3 +2,5 @@
 data
 *.pyc
 models
+*.ipynb
+.ipynb_checkpoints
