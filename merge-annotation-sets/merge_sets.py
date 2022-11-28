@@ -95,7 +95,7 @@ def preprocess_annset(doc, annset_exclusion_list, types_list, type_relation_df):
   ordered_myannotation_list = [annotation for annotation in sorted(myannotation_list, key=lambda ann: (ann.start, ann.end, ann.ann_type))]
   return ordered_myannotation_list
 
-
+# TODO riscrivere sfruttando gatenlp
 def analyze_overlap(annotation_set_input):
     annotation_set = annotation_set_input.copy()
     current_element = None
