@@ -42,7 +42,7 @@ def get_annotated_example(doc, annotation_set, type_id, span=50, doc_id=None):
     # iterate over annotation
     example_list = [] # save example here
     labels = [] # save unique labels
-
+    duplicate_list = []
     for ann in doc['annotation_sets'][annotation_set]['annotations']:
         mention = ann['features']['mention'].replace('\n', ' ') # get mention
         mention_type = ann['type'] # get label
@@ -85,13 +85,20 @@ def get_annotated_example(doc, annotation_set, type_id, span=50, doc_id=None):
                 context_start = int(context_start + first_space+1)
                 context_end = context_start + len(context_clean)       
                 
-            # save in a dictionary
-            example = {'mention':mention, 'mention_type':type_id, 'text':context_clean, 
-                    'offset_doc_start':mention_start, 'offset_doc_end':mention_end, 
-                    'offset_ex_start':mention_start-context_start,
-                    'offset_ex_end':mention_start-context_start+len(mention),
-                    'doc_id': doc_id, 'id':ann['id']}
-            example_list.append(example)
+            # check if duplicate
+            duplicate_tmp = f'{type_id}_{mention_start}'
+            if duplicate_tmp not in duplicate_list:
+                # save in a dictionary
+                example = {'mention':mention, 'mention_type':type_id, 'text':context_clean, 
+                        'offset_doc_start':mention_start, 'offset_doc_end':mention_end, 
+                        'offset_ex_start':mention_start-context_start,
+                        'offset_ex_end':mention_start-context_start+len(mention),
+                        'doc_id': doc_id, 'id':ann['id']}
+                example_list.append(example)
+                # keep track of duplicates
+                duplicate_list.append(duplicate_tmp)
+
+
     return (example_list, labels)
 
 
