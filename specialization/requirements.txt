@@ -1,6 +1,10 @@
 fastapi
 uvicorn
 gatenlp
-pandas
 python-dotenv
 requests
+transformers
+numpy
+pandas
+torch
+imbalanced-learn
