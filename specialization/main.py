@@ -19,8 +19,8 @@ load_dotenv()
 
 PIPELINE_ADDRESS = os.getenv('PIPELINE_ADDRESS')
 API_GET_DOCUMENT = f'{PIPELINE_ADDRESS}/api/mongo/document'
-ANNOTATION_SET_ZERO = 'entities_PoC_specialization_template' # TODO: rendere dinamico dopo la PoC
-ANNOTATION_SET_FEW = 'entities_PoC_test_fewshot' # TODO: rendere dinamico dopo la PoC 
+ANNOTATION_SET_ZERO = 'entities_PoC_specialization_template' # NOTE: hardcoded for PoC
+ANNOTATION_SET_FEW = 'entities_PoC_test_fewshot' # NOTE: hardcoded for PoC 
 
 class FewShotInput(BaseModel):
     type_id: str
@@ -39,7 +39,7 @@ async def startup_event():
     global prompt_model
     prompt_model = Prompting(model_name)
 
-# NOTE: serve solo per la demo
+# NOTE: used only for the PoC. Few-shot results were computed offline, then uploaded
 @app.post('/api/specialization/few')
 async def get_few(body: FewShotInput):
     print('FEWSHOT API CALLED')
