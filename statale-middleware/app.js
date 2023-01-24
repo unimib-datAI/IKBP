@@ -2,6 +2,8 @@ import * as dotenv from 'dotenv'
 dotenv.config()
 import Fastify from 'fastify';
 import fetch from 'node-fetch';
+import fs from 'fs';
+import { readFile } from 'fs/promises';
 
 const server = Fastify({ logger: true })
 
@@ -23,10 +25,17 @@ const processAnnotations = (text, annotations = []) => {
       type,
       features: {
         ...ann.features,
-        is_nil: getIsNil(),
+        is_nil: getIsNil(ann),
         mention: text.slice(ann.start, ann.end)
       }
     }
+  })
+}
+
+const processAnnotationsUnimib = (annotations = []) => {
+  return annotations.map((ann) => {
+    ann.type = ann.type.toLowerCase();
+    return ann;
   })
 }
 
@@ -40,6 +49,7 @@ const processAnnotationSets = (text, annotation_sets) => {
         annotations: processAnnotations(text, ann_set.annotations)
       }
     } else {
+      ann_set.annotations = processAnnotationsUnimib(ann_set.annotations);
       acc[ann_set.name] = ann_set;
     }
 
@@ -69,8 +79,37 @@ const processStataleDocument = (doc, docId) => {
 server.get('/mongo/document/:id', async (request, reply) => {
   const { id } = request.params;
   const [source, docId] = id.split(/_(.*)/s);
-  const doc = await (await fetch(`${process.env.API_STATALE}/doc_id/${docId}/sorgente/${source}`)).json();
-  return processStataleDocument(doc, docId);
+  let doc;
+
+  try {
+    if (fs.existsSync(`/app/docs/${docId}.json`)) {
+      console.log('chiamata a file');
+      //file exists
+      doc = JSON.parse(await readFile(`/app/docs/${docId}.json`));
+    } else {
+      throw 'Doc not existing';
+    }
+  } catch (err) {
+    console.log('chiamata a unimi');
+    doc = await (await fetch(`${process.env.API_STATALE}/doc_id/${docId}/sorgente/${source}`)).json();
+    doc = processStataleDocument(doc, docId);
+  }
+  return doc;
+})
+
+server.post('/mongo/save', async (request, reply) => {
+  const { docId, doc } = request.body;
+  const [source, id] = docId.split(/_(.*)/s);
+
+  const res = await (await fetch(`${process.env.API_STATALE_SAVE}/pygiustizia/update/doc/`, {
+    method: 'POST',
+    body: JSON.stringify({
+      doc_id: id,
+      doc_gatenlp: doc
+    })
+  })).json();
+
+  return res;
 })
 
 // Run the server!
