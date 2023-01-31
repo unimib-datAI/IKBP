@@ -4,7 +4,7 @@ from pydantic import BaseModel
 import uvicorn
 from blink.main_dense import load_biencoder, _process_biencoder_dataloader
 from blink.biencoder.eval_biencoder import get_candidate_pool_tensor
-from typing import List, Optional
+from typing import List, Optional, Dict
 import json
 from tqdm import tqdm
 import torch
@@ -91,7 +91,7 @@ async def encode_mention_from_doc(doc: dict = Body(...)):
     return doc.to_dict()
 
 @app.post('/api/blink/biencoder/mention')
-async def encode_mention(samples: List[Mention]):
+async def encode_mention(samples: List[Dict]):
     samples = [dict(s) for s in samples]
     dataloader = _process_biencoder_dataloader(
         samples, biencoder.tokenizer, biencoder_params
