@@ -6,3 +6,4 @@ _files/*
 .pnpm-store
 review-annotations
 ignore
+ids.json
