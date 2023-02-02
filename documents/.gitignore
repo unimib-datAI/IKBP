@@ -4,3 +4,5 @@ _files/*
 !_files/text.txt
 .env
 .pnpm-store
+review-annotations
+ignore
