@@ -37,11 +37,33 @@ const commandsFunctions = {
     console.log('Avarage annotation time per document: ', totalTimeAnnotation / data.length / 60)
   },
   links: (folders) => {
-    let links = {
-      wikipedia: [],
-      nil: [],
-      skip: []
+
+    const getTotal = (linkGroups) => {
+      return Object.values(linkGroups).reduce((acc, linkGroup) => acc + linkGroup.length, 0);
     }
+
+    const getTotalStat = (documentStats, column) => {
+      return documentStats.reduce((acc, stats) => acc + stats[column], 0);
+    }
+
+    const getMeanStat = (documentStats, column) => {
+      return documentStats.reduce((acc, stats) => acc + stats[column], 0) / documentStats.length;
+    }
+
+    const getUniqueLinks = (linkGroups) => {
+      let uniqueLinks = {
+        wikipedia: [],
+        nil: [],
+        skip: []
+      }
+      for (const key in linkGroups) {
+        uniqueLinks[key] = Array.from(new Set(linkGroups[key]));
+      }
+      return uniqueLinks;
+    }
+
+    let linksStats = [];
+
     folders.forEach((folder) => {
       const files = fs.readdirSync(`${path}/${folder}`);
 
@@ -49,7 +71,7 @@ const commandsFunctions = {
         const doc = JSON.parse(fs.readFileSync(`${path}/${folder}/${file}`));
         const annSet = Object.values(doc.annotation_sets)[0];
 
-        links = annSet.annotations.reduce((acc, ann) => {
+        const linkGroups = annSet.annotations.reduce((acc, ann) => {
           const { url } = ann.features;
 
           if (url.includes('wikipedia')) {
@@ -61,36 +83,41 @@ const commandsFunctions = {
           }
           return acc;
 
-        }, links);
+        }, { wikipedia: [], nil: [], skip: [] });
+
+        const uniqueLinks = getUniqueLinks(linkGroups);
+
+        linksStats.push({
+          id: doc.name,
+          n_mentions: getTotal(linkGroups),
+          total_wikipedia_links: linkGroups.wikipedia.length,
+          total_nil_links: linkGroups.nil.length,
+          total_skipped_mentions: linkGroups.skip.length,
+          total_unique_clusters: getTotal(uniqueLinks),
+          wikipedia_unique_clusters: uniqueLinks.wikipedia.length,
+          nil_unique_clusters: uniqueLinks.nil.length
+        })
       })
     })
 
-    const getTotal = (links) => {
-      return Object.values(links).reduce((acc, linkGroup) => acc + linkGroup.length, 0);
-    }
 
-    const getUniqueLinks = (links) => {
-      let uniqueLinks = {
-        wikipedia: [],
-        nil: [],
-        skip: []
-      }
-      for (const key in links) {
-        uniqueLinks[key] = Array.from(new Set(links[key]));
-      }
-      return uniqueLinks;
-    }
-
-    const uniqueLinks = getUniqueLinks(links);
-
-    console.log('Total mentions: ', getTotal(links))
-    console.log('Total wikipedia links: ', links.wikipedia.length)
-    console.log('Total nil links: ', links.nil.length)
-    console.log('Total skipped mentions: ', links.skip.length)
-    console.log('Total unique clusters: ', getTotal(uniqueLinks))
-    console.log('Wikipedia unique clusters: ', uniqueLinks.wikipedia.length)
-    console.log('Nil unique clusters: ', uniqueLinks.nil.length)
-
+    console.table(linksStats);
+    console.log('\n------------------------AVARAGE STATS PER DOCUMENT------------------------\n')
+    console.log('Avarage mentions per document: ', getMeanStat(linksStats, 'n_mentions'))
+    console.log('Avarage total wikipedia links per document: ', getMeanStat(linksStats, 'total_wikipedia_links'))
+    console.log('Avarage total nil links per document: ', getMeanStat(linksStats, 'total_nil_links'))
+    console.log('Avarage total skipped mentions per document: ', getMeanStat(linksStats, 'total_skipped_mentions'))
+    console.log('Avarage unique clusters per document: ', getMeanStat(linksStats, 'total_unique_clusters'))
+    console.log('Avarage wikipedia unique clusters per document: ', getMeanStat(linksStats, 'wikipedia_unique_clusters'))
+    console.log('Avarage nil unique clusters per document: ', getMeanStat(linksStats, 'nil_unique_clusters'))
+    console.log('\n------------------------TOTAL STATS------------------------\n')
+    console.log('Total mentions: ', getTotalStat(linksStats, 'n_mentions'))
+    console.log('Total wikipedia links: ', getTotalStat(linksStats, 'total_wikipedia_links'))
+    console.log('Total nil links: ', getTotalStat(linksStats, 'total_nil_links'))
+    console.log('Total skipped mentions: ', getTotalStat(linksStats, 'total_skipped_mentions'))
+    console.log('Total unique clusters: ', getTotalStat(linksStats, 'total_unique_clusters'))
+    console.log('Wikipedia unique clusters: ', getTotalStat(linksStats, 'wikipedia_unique_clusters'))
+    console.log('Nil unique clusters: ', getTotalStat(linksStats, 'nil_unique_clusters'))
   }
 }
 
