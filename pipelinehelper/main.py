@@ -43,7 +43,7 @@ def run(doc, doc_id = None):
     if not 'pipeline' in doc.features:
         doc.features['pipeline'] = []
 
-    if 'sectionator' in doc.features['pipeline']:
+    if 'sectionator' in doc.features['pipeline'] + skip_pipeline:
         print('Skipping sectionator: already done')
     else:
         res_ner = requests.post(args.sectionator, json=doc.to_dict())
@@ -51,7 +51,7 @@ def run(doc, doc_id = None):
             raise Exception('sectionator error')
         doc = Document.from_dict(res_ner.json())
 
-    if 'spacyner' in doc.features['pipeline']:
+    if 'spacyner' in doc.features['pipeline'] + skip_pipeline:
         print('Skipping spacyner: already done')
     else:
         res_ner = requests.post(args.spacyner, json=doc.to_dict())
@@ -59,7 +59,7 @@ def run(doc, doc_id = None):
             raise Exception('spacyNER error')
         doc = Document.from_dict(res_ner.json())
 
-    if 'tintner' in doc.features['pipeline']:
+    if 'tintner' in doc.features['pipeline'] + skip_pipeline:
         print('Skipping tintner: already done')
     else:
         res_ner = requests.post(args.tintner, json=doc.to_dict())
@@ -67,7 +67,7 @@ def run(doc, doc_id = None):
             raise Exception('tintNER error')
         doc = Document.from_dict(res_ner.json())
 
-    if 'triener' in doc.features['pipeline']:
+    if 'triener' in doc.features['pipeline'] + skip_pipeline:
         print('Skipping triener: already done')
     else:
         res_ner = requests.post(args.triener, json=doc.to_dict())
@@ -75,7 +75,7 @@ def run(doc, doc_id = None):
             raise Exception('trieNER error')
         doc = Document.from_dict(res_ner.json())
 
-    if 'mergener' in doc.features['pipeline']:
+    if 'mergener' in doc.features['pipeline'] + skip_pipeline:
         print('Skipping mergener: already done')
     else:
         res_ner = requests.post(args.mergener, json=doc.to_dict())
@@ -83,7 +83,7 @@ def run(doc, doc_id = None):
             raise Exception('mergeNER error')
         doc = Document.from_dict(res_ner.json())
 
-    if 'biencoder' in doc.features['pipeline']:
+    if 'biencoder' in doc.features['pipeline'] + skip_pipeline:
         print('Skipping biencoder: already done')
     else:
         res_biencoder = requests.post(args.biencoder_mention, json=doc.to_dict())
@@ -91,7 +91,7 @@ def run(doc, doc_id = None):
             raise Exception('Biencoder errror')
         doc = Document.from_dict(res_biencoder.json())
 
-    if 'indexer' in doc.features['pipeline']:
+    if 'indexer' in doc.features['pipeline'] + skip_pipeline:
         print('Skipping indexer: already done')
     else:
         res_indexer = requests.post(args.indexer_search, json=doc.to_dict())
@@ -99,7 +99,7 @@ def run(doc, doc_id = None):
             raise Exception('Indexer error')
         doc = Document.from_dict(res_indexer.json())
 
-    if 'nilprediction' in doc.features['pipeline']:
+    if 'nilprediction' in doc.features['pipeline'] + skip_pipeline:
         print('Skipping nilprediction: already done')
     else:
         res_nilprediction = requests.post(args.nilpredictor, json=doc.to_dict())
@@ -124,7 +124,7 @@ def run(doc, doc_id = None):
     #                 annotation._type = annotation.features['linking']['top_candidate']['type_']
     # # TODO ensure consistency between types
 
-    if 'nilclustering' in doc.features['pipeline']:
+    if 'nilclustering' in doc.features['pipeline'] + skip_pipeline:
         print('Skipping nilclustering: already done')
     else:
         res_clustering = requests.post(args.nilcluster, json=doc.to_dict())
@@ -132,7 +132,7 @@ def run(doc, doc_id = None):
             raise Exception('Clustering error')
         doc = Document.from_dict(res_clustering.json())
 
-    if 'postprocess' in doc.features['pipeline']:
+    if 'postprocess' in doc.features['pipeline'] + skip_pipeline:
         print('Skipping postprocess: already done')
     else:
         res_postprocess = requests.post(args.postprocess, json=doc.to_dict())
@@ -258,6 +258,10 @@ if __name__ == '__main__':
     parser.add_argument(
         "--api-mongo", type=str, default=None, help="mongo URL", dest='mongo', required=False
     )
+    # skip pipeline
+    parser.add_argument(
+        "--skip-pipeline", type=str, default='', help="Skip pipelines (comma separated)", dest='skip_pipeline', required=False
+    )
 
     args = parser.parse_args()
 
@@ -291,5 +295,7 @@ if __name__ == '__main__':
         args.postprocess = args.baseurl + '/api/postprocess/doc'
     if args.mongo is None:
         args.mongo = args.baseurl + '/api/mongo'
+
+    skip_pipeline = args.skip_pipeline.split(',')
 
     uvicorn.run(app, host = args.host, port = args.port)
