@@ -39,6 +39,9 @@ if __name__ == '__main__':
         "--path-to-saved-tries", type=str, default=None, dest='path_to_saved_tries', help="Base path to saved tries",
     )
     parser.add_argument(
+        "--path-to-stopwords", type=str, default=None, dest='path_to_stopwords', help="Base path to stopwrods list",
+    )
+    parser.add_argument(
         "--trie-name", type=str, default=None, dest='trie_name', help="Name of the trie to use"
     )
 
@@ -51,5 +54,9 @@ if __name__ == '__main__':
 
     path_to_trie = Path(args.path_to_saved_tries) / args.trie_name
     tner = TrieNER(path_to_trie)
+
+    with open(args.path_to_stopwords, 'r') as fd:
+        stopwords = fd.read().split('\n')[:-1]
+    tner.init_stopwords(stopwords)
 
     uvicorn.run(app, host = args.host, port = args.port)

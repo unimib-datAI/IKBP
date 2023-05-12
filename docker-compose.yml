@@ -75,6 +75,7 @@ services:
     environment:
       TRIE_NAME: $TRIE_NAME
       PATH_TO_SAVED_TRIES: $PATH_TO_SAVED_TRIES
+      PATH_TO_STOPWORDS_TRIE: $PATH_TO_STOPWORDS_TRIE
 
   mergener:
     restart: $RESTART_POLICY
