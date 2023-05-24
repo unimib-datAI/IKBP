@@ -1,1 +1,4 @@
 psycopg[binary]
+tqdm
+pandas
+numpy

@@ -16,6 +16,8 @@ services:
     volumes:
       - ./postgres/data:/var/lib/postgresql/data
       - "./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql"
+    #ports:
+    #  - 127.0.0.1:5432:5432
 
   mongo:
     restart: $RESTART_POLICY
