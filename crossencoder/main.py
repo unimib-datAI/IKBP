@@ -1,5 +1,5 @@
 import argparse
-from fastapi import FastAPI
+from fastapi import FastAPI, Body
 from pydantic import BaseModel
 import uvicorn
 from blink.main_dense import load_crossencoder, prepare_crossencoder_data, _process_crossencoder_dataloader, _run_crossencoder
@@ -8,6 +8,7 @@ from typing import List, Optional
 import json
 import psycopg
 import pandas as pd
+from gatenlp import Document
 
 class TupleDict(object):
     def __init__(self):
@@ -90,9 +91,83 @@ class Item(BaseModel):
     top_k: int
 
 app = FastAPI()
+@app.post('/api/blink/crossencoder/doc')
+async def api_doc(doc: dict = Body(...)):
+    return run_crossencoder_doc(doc, 10)
+
+@app.post('/api/blink/crossencoder/doc/{top_k}')
+# remember `content-type: application/json`
+async def api_doc_topk(top_k: int, doc: dict = Body(...)):
+    return run_crossencoder_doc(doc, top_k)
+
+def run_crossencoder_doc(doc, top_k = 10):
+    doc = Document.from_dict(doc)
+
+    annsets_to_link = set([doc.features.get('annsets_to_link', 'entities_merged')])
+
+    samples = []
+    mentions = []
+    candidates = []
+
+    for annset_name in set(doc.annset_names()).intersection(annsets_to_link):
+        # if not annset_name.startswith('entities'):
+        #     # considering only annotation sets of entities
+        #     continue
+        for mention in doc.annset(annset_name):
+            if 'crossencoder' in mention.features and mention.features['crossencoder'].get('skip', False):
+                # DATES should skip = true bcs linking useless
+                continue
+            blink_dict = {
+                # TODO use sentence instead of document?
+                # TODO test with very big context
+                'context_left': mention.features['context_left'] if 'context_left' in mention.features \
+                                                                    else doc.text[:mention.start],
+                'context_right': mention.features['context_right'] if 'context_right' in mention.features \
+                                                                    else doc.text[mention.end:],
+                'mention': mention.features['mention'] if 'mention' in mention.features \
+                                                                    else doc.text[mention.start:mention.end],
+                #
+                'label': 'unknown',
+                'label_id': -1,
+            }
+
+            current_candidates = [
+                Candidate.parse_obj(c) for c in mention.features['linking']['candidates']
+            ]
+
+            samples.append(Mention.parse_obj(blink_dict))
+            mentions.append(mention)
+            candidates.append(current_candidates)
+
+    item = Item(samples = samples, candidates = candidates, top_k = top_k)
+
+    crossencoder_result = crossencoder_run(item)
+
+    # update candidate order
+    candidates_iterator = iter(crossencoder_result)
+    for annset_name in set(doc.annset_names()).intersection(annsets_to_link):
+        # if not annset_name.startswith('entities'):
+        #     # considering only annotation sets of entities
+        #     continue
+        for mention in doc.annset(annset_name):
+            mention.features['linking']['candidates'] = next(candidates_iterator)
+            mention.features['linking']['top_candidate'] = mention.features['linking']['candidates'][0]
+
+            mention.features['title'] = mention.features['linking']['top_candidate'].title
+            mention.features['url'] = mention.features['linking']['top_candidate'].url
+            mention.features['additional_candidates'] = mention.features['linking']['candidates']
+
+    if not 'pipeline' in doc.features:
+        doc.features['pipeline'] = []
+    doc.features['pipeline'].append('crossencoder')
+
+    return doc.to_dict()
 
 @app.post('/api/blink/crossencoder')
-async def run(item: Item):
+async def api(item: Item):
+    return crossencoder_run(item)
+
+def crossencoder_run(item: Item):
     samples = item.samples
     samples = [dict(s) for s in samples]
 

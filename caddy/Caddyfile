@@ -6,6 +6,9 @@ http:// {
 	handle /api/blink/biencoder* {
 		reverse_proxy biencoder:80
 	}
+	handle /api/blink/crossencoder* {
+		reverse_proxy crossencoder:80
+	}
 	handle /api/indexer* {
 		reverse_proxy indexer:80
 	}

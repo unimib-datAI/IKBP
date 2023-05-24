@@ -63,6 +63,28 @@ services:
     # command: python main.py --host 0.0.0.0 --port 80 --biencoder_model $BIENCODER_MODEL --biencoder_config $BIENCODER_CONFIG
     # command: sleep 3600
 
+  crossencoder:
+    restart: $RESTART_POLICY
+    #image: rpozzi/blink_biencoder
+    build:
+      context: ./crossencoder
+      dockerfile: Dockerfile
+    volumes:
+      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - ./crossencoder/main.py:/home/app/main.py
+    environment:
+      PYTHONPATH: /home/app
+      CROSSENCODER_MODEL: $CROSSENCODER_MODEL
+      CROSSENCODER_CONFIG: $CROSSENCODER_CONFIG
+      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [ gpu ]
+    # command: python main.py --host 0.0.0.0 --port 80 --biencoder_model $BIENCODER_MODEL --biencoder_config $BIENCODER_CONFIG
+    # command: sleep 3600
+
   indexer:
     restart: $RESTART_POLICY
     # image: rpozzi/blink_indexer
