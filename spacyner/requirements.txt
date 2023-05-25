@@ -1,6 +1,5 @@
-spacy
+spacy[cuda113]
 spacy-transformers
 thinc[cuda113,torch]
-fastapi
-uvicorn
+flask
 gatenlp
