@@ -4,7 +4,7 @@ tqdm==4.32.1
 pandas
 numpy
 textdistance
-sklearn
+scikit-learn
 scikit-learn-extra
 uvicorn
 fastapi
