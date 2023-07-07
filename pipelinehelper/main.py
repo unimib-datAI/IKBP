@@ -8,6 +8,7 @@ import requests
 import numpy as np
 import os
 from gatenlp import Document
+import copy
 
 class Req(BaseModel):
     doc_id: int # doc id
@@ -59,29 +60,35 @@ def run(doc, doc_id = None):
             raise Exception('spacyNER error')
         doc = Document.from_dict(res_ner.json())
 
-    if 'tintner' in doc.features['pipeline'] + skip_pipeline:
-        print('Skipping tintner: already done')
-    else:
-        res_ner = requests.post(args.tintner, json=doc.to_dict())
-        if not res_ner.ok:
-            raise Exception('tintNER error')
-        doc = Document.from_dict(res_ner.json())
+    # if 'tintner' in doc.features['pipeline'] + skip_pipeline:
+    #     print('Skipping tintner: already done')
+    # else:
+    #     res_ner = requests.post(args.tintner, json=doc.to_dict())
+    #     if not res_ner.ok:
+    #         raise Exception('tintNER error')
+    #     doc = Document.from_dict(res_ner.json())
 
-    if 'triener' in doc.features['pipeline'] + skip_pipeline:
-        print('Skipping triener: already done')
-    else:
-        res_ner = requests.post(args.triener, json=doc.to_dict())
-        if not res_ner.ok:
-            raise Exception('trieNER error')
-        doc = Document.from_dict(res_ner.json())
+    # if 'triener' in doc.features['pipeline'] + skip_pipeline:
+    #     print('Skipping triener: already done')
+    # else:
+    #     res_ner = requests.post(args.triener, json=doc.to_dict())
+    #     if not res_ner.ok:
+    #         raise Exception('trieNER error')
+    #     doc = Document.from_dict(res_ner.json())
 
-    if 'mergener' in doc.features['pipeline'] + skip_pipeline:
-        print('Skipping mergener: already done')
-    else:
-        res_ner = requests.post(args.mergener, json=doc.to_dict())
-        if not res_ner.ok:
-            raise Exception('mergeNER error')
-        doc = Document.from_dict(res_ner.json())
+    # if 'mergener' in doc.features['pipeline'] + skip_pipeline:
+    #     print('Skipping mergener: already done')
+    # else:
+    #     res_ner = requests.post(args.mergener, json=doc.to_dict())
+    #     if not res_ner.ok:
+    #         raise Exception('mergeNER error')
+    #     doc = Document.from_dict(res_ner.json())
+
+    docdict = doc.to_dict()
+    docdict['annotation_sets']['entities_merged'] = docdict['annotation_sets']['entities_spacy_it_trf_v1.0.0']
+    docdict['annotation_sets']['entities_merged']['name'] = 'entities_merged'
+    del docdict['annotation_sets']['entities_spacy_it_trf_v1.0.0']
+    doc = Document.from_dict(docdict)
 
     if 'biencoder' in doc.features['pipeline'] + skip_pipeline:
         print('Skipping biencoder: already done')
