@@ -111,8 +111,10 @@ def run(doc, doc_id = None):
     else:
         res_nilprediction = requests.post(args.nilpredictor, json=doc.to_dict())
         if not res_nilprediction.ok:
-            raise Exception('NIL prediction error')
-        doc = Document.from_dict(res_nilprediction.json())
+            #raise Exception('NIL prediction error')
+            pass
+        else:
+            doc = Document.from_dict(res_nilprediction.json())
 
     # # if top_candidate is not NIL, then set its type as NER type #TODO study if ner is the correct place for the type
     # for annset_name in doc.annset_names():
@@ -131,21 +133,21 @@ def run(doc, doc_id = None):
     #                 annotation._type = annotation.features['linking']['top_candidate']['type_']
     # # TODO ensure consistency between types
 
-    if 'nilclustering' in doc.features['pipeline'] + skip_pipeline:
-        print('Skipping nilclustering: already done')
-    else:
-        res_clustering = requests.post(args.nilcluster, json=doc.to_dict())
-        if not res_clustering.ok:
-            raise Exception('Clustering error')
-        doc = Document.from_dict(res_clustering.json())
+   # if 'nilclustering' in doc.features['pipeline'] + skip_pipeline:
+   #     print('Skipping nilclustering: already done')
+   # else:
+   #     res_clustering = requests.post(args.nilcluster, json=doc.to_dict())
+   #     if not res_clustering.ok:
+   #         raise Exception('Clustering error')
+   #     doc = Document.from_dict(res_clustering.json())
 
-    if 'postprocess' in doc.features['pipeline'] + skip_pipeline:
-        print('Skipping postprocess: already done')
-    else:
-        res_postprocess = requests.post(args.postprocess, json=doc.to_dict())
-        if not res_postprocess.ok:
-            raise Exception('postprocess error')
-        doc = Document.from_dict(res_postprocess.json())
+    #if 'postprocess' in doc.features['pipeline'] + skip_pipeline:
+    #    print('Skipping postprocess: already done')
+    #else:
+    #    res_postprocess = requests.post(args.postprocess, json=doc.to_dict())
+    #    if not res_postprocess.ok:
+    #        raise Exception('postprocess error')
+    #    doc = Document.from_dict(res_postprocess.json())
 
     if doc.features.get('populate', False):
         # get clusters

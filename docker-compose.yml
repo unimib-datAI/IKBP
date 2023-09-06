@@ -158,6 +158,8 @@ services:
         API_BASE_URI: ${PIPELINE_ADDRESS}/api
         API_USERNAME: ""
         API_PASSWORD: ""
+        API_LLM: $UI_API_LLM
+        API_INDEXER: $UI_API_INDEXER
         NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
         NEXTAUTH_URL: $UI_NEXTAUTH_URL
         NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
@@ -170,10 +172,12 @@ services:
       API_BASE_URI: ${PIPELINE_ADDRESS}/api
       API_USERNAME: ""
       API_PASSWORD: ""
+      API_LLM: $UI_API_LLM
+      API_INDEXER: $UI_API_INDEXER
       NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
       NEXTAUTH_URL: $UI_NEXTAUTH_URL
       NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
       NEXT_PUBLIC_FULL_PATH: $UI_NEXT_PUBLIC_FULL_PATH
-    volumes:
-      - ./giustizia-ui/modules:/app/modules
+    # volumes:
+    #   - ./giustizia-ui/modules:/app/modules
         #command: sleep 7200

@@ -252,6 +252,9 @@ def search(encodings, top_k, only_indexes=None):
             n = 0
             candidate_ids = set([id for cs in candidates for id in cs])
 
+            if not candidate_ids:
+                return []
+
             try:
                 with dbconnection.cursor() as cur:
                     cur.execute("""
