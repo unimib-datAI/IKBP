@@ -9,3 +9,4 @@ scikit-learn-extra
 uvicorn
 fastapi
 gatenlp
+pydantic==1.10.9
