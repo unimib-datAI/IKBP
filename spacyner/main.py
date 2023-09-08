@@ -1,20 +1,24 @@
 import argparse
+from fastapi import FastAPI, Body
+from pydantic import BaseModel
+import uvicorn
 import spacy
 from spacy.cli import download as spacy_download
-from flask import Flask, request
+
 from gatenlp import Document
 
 DEFAULT_TAG='aplha_v0.1.0_spacy'
 
+class Item(BaseModel):
+    text: str
+
+app = FastAPI()
+
 def restructure_newline(text):
   return text.replace('\n', ' ')
 
-app = Flask(__name__)
-
-@app.route('/api/spacyner', methods=['POST'])
-def encode_mention():
-
-    doc = request.json
+@app.post('/api/spacyner')
+async def encode_mention(doc: dict = Body(...)):
 
     # replace wrong newlines
     text = restructure_newline(doc['text'])
@@ -80,7 +84,6 @@ if __name__ == '__main__':
     print('Loading spacy model...')
     # Load spacy model
     try:
-        spacy.require_gpu()
         spacy_pipeline = spacy.load(args.model, exclude=['tok2vec', 'morphologizer', 'tagger', 'parser', 'attribute_ruler', 'lemmatizer'])
     except Exception as e:
         print('Caught exception:', e, '... Trying to download spacy model ...')
@@ -92,4 +95,4 @@ if __name__ == '__main__':
 
     print('Loading complete.')
 
-    app.run(host = args.host, port = args.port)
+    uvicorn.run(app, host = args.host, port = args.port)
