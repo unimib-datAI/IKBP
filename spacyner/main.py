@@ -4,10 +4,14 @@ from pydantic import BaseModel
 import uvicorn
 import spacy
 from spacy.cli import download as spacy_download
-
+import os
 from gatenlp import Document
 
 DEFAULT_TAG='aplha_v0.1.0_spacy'
+model = ''
+tag = 'merged'
+senter = False
+spacy_pipeline = None
 
 class Item(BaseModel):
     text: str
@@ -19,23 +23,27 @@ def restructure_newline(text):
 
 @app.post('/api/spacyner')
 async def encode_mention(doc: dict = Body(...)):
+    global model
+    global senter
+    global tag
+    global spacy_pipeline
 
     # replace wrong newlines
     text = restructure_newline(doc['text'])
 
     doc = Document.from_dict(doc)
-    entity_set = doc.annset('entities_{}'.format(args.tag))
+    entity_set = doc.annset('entities_{}'.format(tag))
 
     spacy_out = spacy_pipeline(text)
 
     # sentences
-    if args.sents:
-        sentence_set = doc.annset('sentences_{}'.format(args.tag))
+    if senter:
+        sentence_set = doc.annset('sentences_{}'.format(tag))
         for sent in spacy_out.sents:
             # TODO keep track of entities in this sentence?
             sentence_set.add(sent.start_char, sent.end_char, "sentence", {
                 "source": "spacy",
-                "spacy_model":args.model
+                "spacy_model": model
             })
 
     for ent in spacy_out.ents:
@@ -46,7 +54,7 @@ async def encode_mention(doc: dict = Body(...)):
                 "type": ent.label_,
                 "score": 1.0,
                 "source": "spacy",
-                "spacy_model": args.model
+                "spacy_model": model
                 }}
         if ent.label_ == 'DATE':
             feat_to_add['linking'] = {
@@ -60,6 +68,30 @@ async def encode_mention(doc: dict = Body(...)):
     doc.features['pipeline'].append('spacyner')
 
     return doc.to_dict()
+
+def initialize():
+    global model
+    global senter
+    global spacy_pipeline
+    print('Loading spacy model...')
+    # Load spacy model
+    try:
+        spacy_pipeline = spacy.load(model, exclude=['tok2vec', 'morphologizer', 'tagger', 'parser', 'attribute_ruler', 'lemmatizer'])
+    except Exception as e:
+        print('Caught exception:', e, '... Trying to download spacy model ...')
+        spacy_download(model)
+        spacy_pipeline = spacy.load(model, exclude=['tok2vec', 'morphologizer', 'tagger', 'parser', 'attribute_ruler', 'lemmatizer'])
+
+    # gpu
+    gpu = spacy.prefer_gpu()
+    print('Using', 'gpu' if gpu else 'cpu', flush=True)
+
+    # sentences
+    if senter:
+        spacy_pipeline.enable_pipe('senter')
+
+    print('Loading complete.')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -81,18 +113,15 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    print('Loading spacy model...')
-    # Load spacy model
-    try:
-        spacy_pipeline = spacy.load(args.model, exclude=['tok2vec', 'morphologizer', 'tagger', 'parser', 'attribute_ruler', 'lemmatizer'])
-    except Exception as e:
-        print('Caught exception:', e, '... Trying to download spacy model ...')
-        spacy_download(args.model)
-        spacy_pipeline = spacy.load(args.model, exclude=['tok2vec', 'morphologizer', 'tagger', 'parser', 'attribute_ruler', 'lemmatizer'])
-    # sentences
-    if args.sents:
-        spacy_pipeline.enable_pipe('senter')
+    model = args.model
+    senter = args.sents
+    tag = args.tag
 
-    print('Loading complete.')
+    initialize()
 
     uvicorn.run(app, host = args.host, port = args.port)
+else:
+    model = os.environ.get('SPACY_MODEL')
+    senter = os.environ.get('SPACY_SENTER', False)
+    tag = os.environ.get('SPACY_TAG', 'merged')
+    initialize()

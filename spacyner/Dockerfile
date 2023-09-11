@@ -6,4 +6,4 @@ COPY . .
 
 RUN pip install --no-cache-dir --upgrade -r /home/app/requirements.txt
 
-CMD python main.py --host 0.0.0.0 --port 80 --model $SPACY_MODEL --tag "$SPACY_TAG"
+CMD gunicorn -w "$SPACY_WORKERS" main:app -b 0.0.0.0:80 -k uvicorn.workers.UvicornWorker --timeout $SPACY_TIMEOUT --capture-output

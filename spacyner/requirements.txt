@@ -1,6 +1,7 @@
-spacy
+spacy==3.5.2
 spacy-transformers
 thinc[cuda113,torch]
 fastapi
 uvicorn
+gunicorn
 gatenlp
