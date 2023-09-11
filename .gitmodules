@@ -1,9 +1,9 @@
 [submodule ".submodules/BLINK"]
 	path = .submodules/BLINK
 	url = git@github.com:UNIMIBInside/BLINK.git
-[submodule "giustizia-ui"]
-	path = giustizia-ui
-	url = https://github.com/marcoripa96/giustizia-ui
 [submodule "trie-ner/trie-search"]
 	path = trie-ner/trie-search
 	url = https://github.com/nkmrtty/trie-search.git
+[submodule "giustizia-ui"]
+	path = giustizia-ui
+	url = git@github.com:UNIMIBInside/daveUI.git
