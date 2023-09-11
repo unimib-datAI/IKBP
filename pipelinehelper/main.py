@@ -59,30 +59,6 @@ def run(doc, doc_id = None):
             raise Exception('spacyNER error')
         doc = Document.from_dict(res_ner.json())
 
-    if 'tintner' in doc.features['pipeline']:
-        print('Skipping tintner: already done')
-    else:
-        res_ner = requests.post(args.tintner, json=doc.to_dict())
-        if not res_ner.ok:
-            raise Exception('tintNER error')
-        doc = Document.from_dict(res_ner.json())
-
-    if 'triener' in doc.features['pipeline']:
-        print('Skipping triener: already done')
-    else:
-        res_ner = requests.post(args.triener, json=doc.to_dict())
-        if not res_ner.ok:
-            raise Exception('trieNER error')
-        doc = Document.from_dict(res_ner.json())
-
-    if 'mergener' in doc.features['pipeline']:
-        print('Skipping mergener: already done')
-    else:
-        res_ner = requests.post(args.mergener, json=doc.to_dict())
-        if not res_ner.ok:
-            raise Exception('mergeNER error')
-        doc = Document.from_dict(res_ner.json())
-
     if 'biencoder' in doc.features['pipeline']:
         print('Skipping biencoder: already done')
     else:
@@ -220,15 +196,6 @@ if __name__ == '__main__':
         "--api-spacyner", type=str, default=None, help="spacyner URL", dest='spacyner', required=False
     )
     parser.add_argument(
-        "--api-tintner", type=str, default=None, help="tintner URL", dest='tintner', required=False
-    )
-    parser.add_argument(
-        "--api-triener", type=str, default=None, help="triener URL", dest='triener', required=False
-    )
-    parser.add_argument(
-        "--api-mergener", type=str, default=None, help="mergener URL", dest='mergener', required=False
-    )
-    parser.add_argument(
         "--api-biencoder-mention", type=str, default=None, help="biencoder_mention URL", dest='biencoder_mention', required=False
     )
     parser.add_argument(
@@ -265,12 +232,6 @@ if __name__ == '__main__':
         args.sectionator = args.baseurl + '/api/sectionator'
     if args.spacyner is None:
         args.spacyner = args.baseurl + '/api/spacyner'
-    if args.tintner is None:
-        args.tintner = args.baseurl + '/api/tintner'
-    if args.triener is None:
-        args.triener = args.baseurl + '/api/triener'
-    if args.mergener is None:
-        args.mergener = args.baseurl + '/api/mergesets/doc'
     if args.biencoder_mention is None:
         args.biencoder_mention = args.baseurl + '/api/blink/biencoder/mention/doc'
     if args.biencoder_entity is None:

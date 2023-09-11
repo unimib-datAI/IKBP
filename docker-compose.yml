@@ -1,13 +1,6 @@
 version: "3"
 services:
 
-  tint:
-    restart: $RESTART_POLICY
-    image: rpozzi/tint
-    # build:
-    #   context: tint
-    #   dockerfile: Dockerfile
-
   postgres:
     restart: $RESTART_POLICY
     image: postgres:14
@@ -104,35 +97,6 @@ services:
       NILPREDICTOR_ARGS: $NILPREDICTOR_ARGS
     # command: python main.py --host 0.0.0.0 --port 80 $NILPREDICTOR_ARGS
 
-  triener:
-    restart: $RESTART_POLICY
-    build:
-        context: ./trie-ner
-        dockerfile: Dockerfile
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-      - ./trie-ner/main.py:/home/app/main.py
-      - ./trie-ner/TrieNER.py:/home/app/TrieNER.py
-    environment:
-      TRIE_NAME: $TRIE_NAME
-      PATH_TO_SAVED_TRIES: $PATH_TO_SAVED_TRIES
-
-  mergener:
-    restart: $RESTART_POLICY
-    build:
-        context: ./merge-annotation-sets
-        dockerfile: Dockerfile
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-      - ./merge-annotation-sets/main.py:/home/app/main.py
-      - ./merge-annotation-sets/build_type_relation_df.py:/home/app/build_type_relation_df.py
-      - ./merge-annotation-sets/merge_sets.py:/home/app/merge_sets.py
-    environment:
-      PATH_TO_TYPES: $MERGE_PATH_TO_TYPES
-      PATH_TO_TYPE_RELATION_CSV: $MERGE_PATH_TO_TYPE_RELATION_CSV
-      PATH_TO_ANNSET_PRIORITY: $MERGE_PATH_TO_ANNSET_PRIORITY
-      #command: sleep 7200
-
   sectionator:
     restart: $RESTART_POLICY
     build:
@@ -191,14 +155,7 @@ services:
         reservations:
           devices:
             - capabilities: [ gpu ]
-    # command: python __main__.py --host 0.0.0.0 --port 80 --model $SPACY_MODEL --tint http://tint:8012/tint
-
-  tintner:
-    restart: $RESTART_POLICY
-    build: ./tintner
-    volumes:
-      - ./tintner/main.py:/home/app/main.py
-    # command: python __main__.py --host 0.0.0.0 --port 80 --model $SPACY_MODEL --tint http://tint:8012/tint
+    # command: python __main__.py --host 0.0.0.0 --port 80 --model $SPACY_MODEL
 
   caddy:
     restart: $RESTART_POLICY
