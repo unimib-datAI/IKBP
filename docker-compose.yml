@@ -202,4 +202,5 @@ services:
       NEXT_PUBLIC_FULL_PATH: $UI_NEXT_PUBLIC_FULL_PATH
     volumes:
       - ./giustizia-ui/modules:/app/modules
+      - ./giustizia-ui/server:/app/server
         #command: sleep 7200
