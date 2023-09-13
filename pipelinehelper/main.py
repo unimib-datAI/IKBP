@@ -100,10 +100,10 @@ def run(doc, doc_id = None):
     #                 annotation._type = annotation.features['linking']['top_candidate']['type_']
     # # TODO ensure consistency between types
 
-    if 'nilclustering' in doc.features['pipeline']:
-        print('Skipping nilclustering: already done')
+    if 'clustering' in doc.features['pipeline']:
+        print('Skipping clustering: already done')
     else:
-        res_clustering = requests.post(args.nilcluster, json=doc.to_dict())
+        res_clustering = requests.post(args.clustering, json=doc.to_dict())
         if not res_clustering.ok:
             raise Exception('Clustering error')
         doc = Document.from_dict(res_clustering.json())
@@ -217,7 +217,7 @@ if __name__ == '__main__':
         "--api-nilpredictor", type=str, default=None, help="nilpredictor URL", dest='nilpredictor', required=False
     )
     parser.add_argument(
-        "--api-nilcluster", type=str, default=None, help="nilcluster URL", dest='nilcluster', required=False
+        "--api-clustering", type=str, default=None, help="clustering URL", dest='clustering', required=False
     )
     parser.add_argument(
         "--api-postprocess", type=str, default=None, help="postprocess URL", dest='postprocess', required=False
@@ -246,8 +246,8 @@ if __name__ == '__main__':
         args.indexer_reset = args.baseurl + '/api/indexer/reset/rw'
     if args.nilpredictor is None:
         args.nilpredictor = args.baseurl + '/api/nilprediction/doc'
-    if args.nilcluster is None:
-        args.nilcluster = args.baseurl + '/api/nilcluster/doc'
+    if args.clustering is None:
+        args.clustering = args.baseurl + '/api/clustering'
     if args.postprocess is None:
         args.postprocess = args.baseurl + '/api/postprocess/doc'
     if args.mongo is None:

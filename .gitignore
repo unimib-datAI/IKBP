@@ -4,3 +4,5 @@ data
 models
 *.ipynb
 .ipynb_checkpoints
+venv
+*.json

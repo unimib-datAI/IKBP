@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+gatenlp
+networkx
+numpy
+textdistance[extras]
+xgboost==1.7.6
+scikit_learn==1.3.0
