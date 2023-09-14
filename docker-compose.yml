@@ -188,6 +188,8 @@ services:
         NEXTAUTH_URL: $UI_NEXTAUTH_URL
         NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
         NEXT_PUBLIC_FULL_PATH: $UI_NEXT_PUBLIC_FULL_PATH
+        API_LLM: $UI_API_LLM
+        API_INDEXER: $UI_API_INDEXER
     ports:
       - $LISTEN_UI:3000
     environment:
@@ -200,7 +202,11 @@ services:
       NEXTAUTH_URL: $UI_NEXTAUTH_URL
       NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
       NEXT_PUBLIC_FULL_PATH: $UI_NEXT_PUBLIC_FULL_PATH
+      API_LLM: $UI_API_LLM
+      API_INDEXER: $UI_API_INDEXER
+
     volumes:
       - ./giustizia-ui/modules:/app/modules
       - ./giustizia-ui/server:/app/server
+      - ./giustizia-ui/pages:/app/pages
         #command: sleep 7200

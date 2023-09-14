@@ -7,3 +7,6 @@
 [submodule "giustizia-ui"]
 	path = giustizia-ui
 	url = git@github.com:UNIMIBInside/daveUI.git
+[submodule "text-generation/src/exllama"]
+	path = text-generation/src/exllama
+	url = https://github.com/turboderp/exllama.git
