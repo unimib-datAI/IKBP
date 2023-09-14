@@ -71,6 +71,28 @@ export default (app) => {
     for (const annset of document.annotation_sets) {
       // delete annset._id;
 
+      // deduplicate sections
+      if (annset.name === 'Sections') {
+        console.log('0here');
+        const new_anns = [];
+        let prev_ann = {};
+
+        annset.annotations.sort((a, b) => a.start - b.start);
+
+        annset.annotations.forEach((ann) => {
+          if (ann.type === prev_ann.type) {
+            if (ann.end >= prev_ann.end) {
+              new_anns.push(ann);
+            } else {
+              new_anns.push(prev_ann);
+            }
+          }
+          prev_ann = ann;
+        });
+
+        annset.annotations = new_anns;
+      }
+
       // add mention to annotations features
       if (annset.name.startsWith('entities')) {
         for (const annot of annset.annotations) {
@@ -148,7 +170,7 @@ export default (app) => {
   /**
    * Get document by id anonymous
    */
-   route.get('/anon/:id', asyncRoute(async (req, res, next) => {
+  route.get('/anon/:id', asyncRoute(async (req, res, next) => {
     const { id } = req.params;
 
     const document = await getDocumentById(id, true);
@@ -159,7 +181,7 @@ export default (app) => {
   /**
    * Get document by id anonymous
    */
-   route.get('/clusters/:id', asyncRoute(async (req, res, next) => {
+  route.get('/clusters/:id', asyncRoute(async (req, res, next) => {
     const { id } = req.params;
 
     const document = await getDocumentById(id, false, true);
@@ -167,48 +189,48 @@ export default (app) => {
     return res.json(document).status(200);
   }));
 
-/**
-   * Update a document
-   */
- route.post('/:id',
- validateRequest(
-   {
-     req: {
-       body: z.object({
-         text: z.string(),
-         annotation_sets: z.object(),
-         preview: z.string().optional(),
-         name: z.string().optional(),
-         features: z.object().optional(),
-         offset_type: z.string().optional()
-       })
-     }
-   }
- ),
- asyncRoute(async (req, res, next) => {
-   // delete document // TODO ROLLBACK on Failure
-   const { id } = req.params;
-   const deleteResults = await deleteDoc({params: {docId: id}}, null, next);
-   // new document object
-   const pre_doc = req.body;
-   pre_doc["id"] = id
-   const newDoc = documentDTO(req.body);
+  /**
+     * Update a document
+     */
+  route.post('/:id',
+    validateRequest(
+      {
+        req: {
+          body: z.object({
+            text: z.string(),
+            annotation_sets: z.object(),
+            preview: z.string().optional(),
+            name: z.string().optional(),
+            features: z.object().optional(),
+            offset_type: z.string().optional()
+          })
+        }
+      }
+    ),
+    asyncRoute(async (req, res, next) => {
+      // delete document // TODO ROLLBACK on Failure
+      const { id } = req.params;
+      const deleteResults = await deleteDoc({ params: { docId: id } }, null, next);
+      // new document object
+      const pre_doc = req.body;
+      pre_doc["id"] = id
+      const newDoc = documentDTO(req.body);
 
-   const doc = await DocumentController.insertOne(newDoc);
-   // insert each annnotation set
-   await Promise.all(Object.values(req.body.annotation_sets).map(async (set) => {
-     const { annotations: newAnnotations, ...rest } = set;
-     const newAnnSet = annotationSetDTO({ docId: doc.id, ...rest });
-     const annSet = await AnnotationSetController.insertOne(newAnnSet);
-     // insert all annotations for a set
-     const newAnnotationsDTOs = newAnnotations.map((ann) => annotationDTO({ annotationSetId: annSet._id, ...ann }));
-     await Annotation.insertMany(newAnnotationsDTOs);
+      const doc = await DocumentController.insertOne(newDoc);
+      // insert each annnotation set
+      await Promise.all(Object.values(req.body.annotation_sets).map(async (set) => {
+        const { annotations: newAnnotations, ...rest } = set;
+        const newAnnSet = annotationSetDTO({ docId: doc.id, ...rest });
+        const annSet = await AnnotationSetController.insertOne(newAnnSet);
+        // insert all annotations for a set
+        const newAnnotationsDTOs = newAnnotations.map((ann) => annotationDTO({ annotationSetId: annSet._id, ...ann }));
+        await Annotation.insertMany(newAnnotationsDTOs);
 
-     return annSet;
-   }));
+        return annSet;
+      }));
 
-   return res.json(doc).status(200);
- }));
+      return res.json(doc).status(200);
+    }));
 
 
   /**
