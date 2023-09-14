@@ -210,3 +210,21 @@ services:
       - ./giustizia-ui/server:/app/server
       - ./giustizia-ui/pages:/app/pages
         #command: sleep 7200
+
+  text-generation:
+    build:
+      context: ./text-generation
+      dockerfile: Dockerfile
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [ gpu ]
+    environment:
+      - MODEL_NAME=${TEXT_GENERATION_MODEL}
+    ports:
+      - $TEXT_GENERATION_ADDR:7862
+    volumes:
+      - ./models/text-generation:/workspace/models
+      - ./text-generation/src:/workspace/src
