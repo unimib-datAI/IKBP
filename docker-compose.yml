@@ -228,3 +228,16 @@ services:
     volumes:
       - ./models/text-generation:/workspace/models
       - ./text-generation/src:/workspace/src
+
+  es:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.7.0
+    restart: $RESTART_POLICY
+    environment:
+      - xpack.security.enabled=false
+      - "cluster.routing.allocation.disk.watermark.low=90%"
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms4096m -Xmx4096m
+    ports:
+      - ${ELASTIC_PORT}:${ELASTIC_PORT}
+    volumes:
+      - ./elasticsearch/data:/usr/share/elasticsearch/data
