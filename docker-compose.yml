@@ -222,12 +222,18 @@ services:
             - driver: nvidia
               capabilities: [ gpu ]
     environment:
-      - MODEL_NAME=${TEXT_GENERATION_MODEL}
+      - TEXT_GENERATION_MODEL=${TEXT_GENERATION_MODEL}
+      - TEXT_GENERATION_WEIGHTS=${TEXT_GENERATION_WEIGHTS}
+      - TEXT_GENERATION_GPU_SPLIT=${TEXT_GENERATION_GPU_SPLIT}
+      - TEXT_GENERATION_WORKERS=${TEXT_GENERATION_WORKERS}
+      - TEXT_GENERATION_TIMEOUT=${TEXT_GENERATION_TIMEOUT}
     ports:
-      - $TEXT_GENERATION_ADDR:7862
+      - $TEXT_GENERATION_ADDR:80
     volumes:
-      - ./models/text-generation:/workspace/models
-      - ./text-generation/src:/workspace/src
+      - ./models/text-generation:/home/app/models
+      - ./text-generation/src/app.py:/home/app/app.py
+      - ./text-generation/src/utils.py:/home/app/utils.py
+      - ./text-generation/cache/huggingface:/root/.cache/huggingface
 
   es:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.7.0

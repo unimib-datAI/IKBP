@@ -1,28 +1,16 @@
-import sys
 import os
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "exllama"))
-
-import glob
 import asyncio
-import uvicorn
-from typing import Union
-from pathlib import Path
 from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import Any, Dict, Optional, List
+from typing import Optional, List
 from fastapi.responses import StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, HTTPException, Request
-from EXLlamaModel import EXLlamaModel
-from exllama.generator import ExLlamaGenerator
-
-
-# exllama imports:
-
-import argparse
+from fastapi import FastAPI
+from transformers import LlamaForCausalLM, LlamaTokenizer
+from peft import PeftModel
+from utils import generate_streaming_completion, generate_completion, prepare_message
+import traceback
 import torch
-import sys
 import os
 
 
@@ -34,57 +22,9 @@ torch.backends.cuda.matmul.allow_tf32 = True
 torch.set_printoptions(precision=10)
 torch_devices = [f"cuda:{i}" for i in range(torch.cuda.device_count())]
 
-# [Parse arguments]:
-parser = argparse.ArgumentParser(description="Simple FastAPI wrapper for ExLlama")
-
-parser.add_argument(
-    "-d",
-    "--directory",
-    type=str,
-    help="Path to directory containing config.json, model.tokenizer and * .safetensors",
-)
-parser.add_argument(
-    "-gs",
-    "--gpu_split",
-    type=str,
-    help="Comma-separated list of VRAM (in GB) to use per GPU device for model layers, e.g. -gs 20,7,7",
-)
-
-args = parser.parse_args()
-
-# Directory check:
-if args.directory is not None:
-    args.tokenizer = os.path.join(args.directory, "tokenizer.model")
-    args.config = os.path.join(args.directory, "config.json")
-    st_pattern = os.path.join(args.directory, "*.safetensors")
-    st = glob.glob(st_pattern)
-    if len(st) == 0:
-        print(f" !! No files matching {st_pattern}")
-        sys.exit()
-    if len(st) > 1:
-        print(f" !! Multiple files matching {st_pattern}")
-        sys.exit()
-    args.model = st[0]
-else:
-    if args.tokenizer is None or args.config is None or args.model is None:
-        print(" !! Please specify -d")
-        sys.exit()
-# -------
-
-
 # Setup FastAPI:
 app = FastAPI()
 semaphore = asyncio.Semaphore(1)
-
-# I need open CORS for my setup, you may not!!
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-# -------
 
 
 # fastapi_chat.html uses this to check what model is being used.
@@ -92,7 +32,7 @@ app.add_middleware(
 @app.get("/check")
 def check():
     # just return name without path or safetensors so we don't expose local paths:
-    model = os.path.basename(args.model).replace(".safetensors", "")
+    model = os.path.basename(MODEL)
 
     return {model}
 
@@ -118,6 +58,23 @@ class GenerateRequest(BaseModel):
     token_repetition_penalty_sustain: Optional[int] = 256
     token_repetition_penalty_decay: Optional[int] = None
     stream: Optional[bool] = True
+    num_beams: Optional[int] = 1
+
+
+# def get_prompt(message: str, chat_history: list[tuple[str, str]],
+#                system_prompt: str) -> str:
+def get_prompt(message, chat_history,
+                system_prompt):
+    texts = [f'<s>[INST] <<SYS>>\n{system_prompt}\n<</SYS>>\n\n']
+    # The first user input is _not_ stripped
+    do_strip = False
+    for user_input, response in chat_history:
+        user_input = user_input.strip() if do_strip else user_input
+        do_strip = True
+        texts.append(f'{user_input} [/INST] {response.strip()} </s><s>[INST] ')
+    message = message.strip() if do_strip else message
+    texts.append(f'{message} [/INST]')
+    return ''.join(texts)
 
 
 @app.post("/generate")
@@ -132,26 +89,26 @@ async def stream_data(req: GenerateRequest):
             await asyncio.sleep(1)
 
     try:
-        # Set these from GenerateRequest:
-        model.generator.settings = ExLlamaGenerator.Settings()
-        model.generator.settings.temperature = req.temperature
-        model.generator.settings.top_k = req.top_k
-        model.generator.settings.top_p = req.top_p
-        model.generator.settings.min_p = req.min_p
-        model.generator.settings.token_repetition_penalty_max = (
-            req.token_repetition_penalty_max
-        )
-        model.generator.settings.token_repetition_penalty_sustain = (
-            req.token_repetition_penalty_sustain
-        )
-        decay = int(
-            req.token_repetition_penalty_decay
-            if req.token_repetition_penalty_decay
-            else req.token_repetition_penalty_sustain / 2
-        )
-        model.generator.settings.token_repetition_penalty_decay = decay
+        # # Set these from GenerateRequest:
+        # model.generator.settings = ExLlamaGenerator.Settings()
+        # model.generator.settings.temperature = req.temperature
+        # model.generator.settings.top_k = req.top_k
+        # model.generator.settings.top_p = req.top_p
+        # model.generator.settings.min_p = req.min_p
+        # model.generator.settings.token_repetition_penalty_max = (
+        #     req.token_repetition_penalty_max
+        # )
+        # model.generator.settings.token_repetition_penalty_sustain = (
+        #     req.token_repetition_penalty_sustain
+        # )
+        # decay = int(
+        #     req.token_repetition_penalty_decay
+        #     if req.token_repetition_penalty_decay
+        #     else req.token_repetition_penalty_sustain / 2
+        # )
+        # model.generator.settings.token_repetition_penalty_decay = decay
 
-        _MESSAGE, max_new_tokens = model.prepare_message(
+        _MESSAGE, max_new_tokens = prepare_message(
             messages=req.messages,
             max_new_tokens=req.max_new_tokens,
         )
@@ -159,25 +116,48 @@ async def stream_data(req: GenerateRequest):
         if req.stream:
             # copy of generate_simple() so that I could yield each token for streaming without having to change generator.py and make merging updates a nightmare:
             print('stream')
-            return StreamingResponse(model.generate_stream(_MESSAGE, max_new_tokens))
+            streamer = generate_streaming_completion({
+                    'model': model,
+                    'tokenizer': tokenizer,
+                    'model_options': req,
+                    'message': _MESSAGE
+                })
+            return StreamingResponse(streamer)
         else:
-            return model.generate(_MESSAGE, max_new_tokens)
+            return generate_completion({
+                    'model': model,
+                    'tokenizer': tokenizer,
+                    'model_options': req,
+                    'message': _MESSAGE
+                })
     except Exception as e:
-        print('Exception', e)
+        print(traceback.format_exc())
+        print('Exception', e, flush=True)
         return {"response": f"Exception while processing request: {e}"}
 
     finally:
         semaphore.release()
 
+######
 
-# -------
+MODEL = os.environ.get('TEXT_GENERATION_MODEL')
+WEIGHTS = os.environ.get('TEXT_GENERATION_WEIGHTS', '')
 
+# Comma-separated list of VRAM (in GB) to use per GPU device for model layers, e.g. -gs 20,7,7
+GPU_SPLIT= os.environ.get('TEXT_GENERATION_GPU_SPLIT', '')
 
-if __name__ == "__main__":
-    model = EXLlamaModel(args.directory, args.gpu_split)
+tokenizer = LlamaTokenizer.from_pretrained(MODEL, add_eos_token=True, use_fast=True)
+model = LlamaForCausalLM.from_pretrained(
+    MODEL,
+    load_in_8bit=True,
+    torch_dtype=torch.float16,
+    device_map="auto",
+)
+model = PeftModel.from_pretrained(
+  model, 
+  WEIGHTS, 
+  device_map="auto",
+  torch_dtype=torch.float16
+)
 
-    # -------
-
-    # [start fastapi]:
-    _PORT = 7862
-    uvicorn.run(app, host="0.0.0.0", port=_PORT)
+print('device on', model.device)
