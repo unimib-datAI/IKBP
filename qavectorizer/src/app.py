@@ -15,6 +15,7 @@ from retriever import DocumentRetriever
 from utils import get_facets_annotations, get_facets_metadata, get_hits
 import torch
 from os import environ
+import json
 
 
 @lru_cache()
@@ -268,6 +269,34 @@ def index_elastic_document(req: IndexElasticDocumentRequest, index_name):
     # except Exception as e:
     #     raise HTTPException(status_code=500, detail=req.embeddings)
 
+def ogg2name(ogg):
+    return ogg2name_index.get(ogg, 'UNKNOWN')
+
+def tipodoc2name(tipo):
+    # TODO
+    if tipo == "S":
+        return "Sentenza"
+    else:
+        return tipo
+
+@app.post("/elastic/index/{index_name}/doc/mongo")
+def index_elastic_document_mongo(req: IndexElasticDocumentRequest, index_name):
+    METADATA_MAP = {
+            'annosentenza': 'Anno Sentenza',
+            'annoruolo': 'Anno Rouolo',
+            'codiceoggetto': lambda x: ogg2name(x),
+            'parte': 'Parte',
+            'controparte': 'Controparte',
+            'nomegiudice': 'Nome Giudice',
+            'tipodocumento': lambda x: tipodoc2name(x),
+            }
+    doc = {}
+    doc['mongo_id'] = IndexElasticDocumentRequest['id']
+    doc['name'] = IndexElasticDocumentRequest['name']
+    doc['text'] = IndexElasticDocumentRequest['text']
+    doc['metadata'] = [{'type': mk, 'value': mv} for mk, mv in IndexElasticDocumentRequest['features'].items() if mk in METADATA_MAP]
+
+    return index_elastic_document(doc, index_name)
 
 class QueryElasticIndexRequest(BaseModel):
     text: str
@@ -430,6 +459,9 @@ if __name__ == "__main__":
 
     DOCS_BASE_URL = "http://" + settings.host_base_url + ":" + settings.docs_port
     retriever = DocumentRetriever(url=DOCS_BASE_URL + "/api/mongo/document")
+
+    with open(environ.get('OGG2NAME_INDEX'), 'r') as fd:
+        ogg2name_index = json.load(fd)
 
     # [start fastapi]:
     _PORT = int(settings.indexer_server_port)

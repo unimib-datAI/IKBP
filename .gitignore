@@ -8,3 +8,4 @@ venv
 *.json
 elasticsearch/data
 text-generation/cache
+.swp
