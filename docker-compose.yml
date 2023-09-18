@@ -269,7 +269,11 @@ services:
       - ELASTIC_PORT=${ELASTIC_PORT}
       - SENTENCE_TRANSFORMER_EMBEDDING_MODEL=${SENTENCE_TRANSFORMER_EMBEDDING_MODEL}
       - SENTENCE_TRANSFORMER_DEVICE=${SENTENCE_TRANSFORMER_DEVICE}
+      - OGG2NAME_INDEX=${OGG2NAME_INDEX}
     ports:
       - ${QAVECTORIZER_ADDR}:7863
     volumes:
+      - ./qavectorizer/src:/workspace
+      - ./models:/root/models
       - ./models/qavectorizer:/root/.cache/huggingface
+

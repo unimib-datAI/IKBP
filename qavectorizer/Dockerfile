@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends wget libxml2-de
     && apt-get install -y --no-install-recommends cuda-toolkit-11-7 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY ./requirements.txt ./src .
+COPY ./src ./
 
 RUN pip install --no-cache-dir -r ./requirements.txt
 
