@@ -1,0 +1,6 @@
+torch==2.0.1
+safetensors==0.3.1
+sentencepiece
+ninja
+fastapi
+uvicorn
