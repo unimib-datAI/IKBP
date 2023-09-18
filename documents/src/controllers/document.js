@@ -19,7 +19,7 @@ export const DocumentController = {
     } catch (err) {
       throw new HTTPError({
         code: HTTP_ERROR_CODES.INTERNAL_SERVER_ERROR,
-        message: 'Could not save document to DB.'
+        message: `Could not save document to DB. ${err}`
       })
     }
   },
