@@ -46,5 +46,8 @@ http:// {
 	handle /api/consolidation* {
 		reverse_proxy consolidation:80
 	}
+	handle /api/interessati* {
+		reverse_proxy interessati:80
+	}
 	respond "404 Not Found" 404
 }
