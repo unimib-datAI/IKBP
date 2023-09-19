@@ -12,6 +12,7 @@ model = ''
 tag = 'merged'
 senter = False
 spacy_pipeline = None
+gpu_id = -1
 
 class Item(BaseModel):
     text: str
@@ -73,6 +74,7 @@ def initialize():
     global model
     global senter
     global spacy_pipeline
+    global gpu_id
     print('Loading spacy model...')
     # Load spacy model
     try:
@@ -83,8 +85,9 @@ def initialize():
         spacy_pipeline = spacy.load(model, exclude=['tok2vec', 'morphologizer', 'tagger', 'parser', 'attribute_ruler', 'lemmatizer'])
 
     # gpu
-    gpu = spacy.prefer_gpu()
-    print('Using', 'gpu' if gpu else 'cpu', flush=True)
+    if gpu_id >= 0:
+        gpu = spacy.prefer_gpu(gpu_id)
+        print('Using', f'gpu {gpu}' if gpu else 'cpu', flush=True)
 
     # sentences
     if senter:
@@ -110,12 +113,16 @@ if __name__ == '__main__':
     parser.add_argument(
         "--sents", action='store_true', default=False, help="Do sentence tokenization",
     )
+    parser.add_argument(
+        "--gpu-id", type=int, default=-1, help="Spacy GPU id",
+    )
 
     args = parser.parse_args()
 
     model = args.model
     senter = args.sents
     tag = args.tag
+    gpu_id = args.gpu_id
 
     initialize()
 
@@ -124,4 +131,5 @@ else:
     model = os.environ.get('SPACY_MODEL')
     senter = os.environ.get('SPACY_SENTER', False)
     tag = os.environ.get('SPACY_TAG', 'merged')
+    gpu_id = int(os.environ.get('SPACY_GPU', -1))
     initialize()

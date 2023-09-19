@@ -13,6 +13,7 @@ SPACY_SENTER=
 SPACY_TAG=merged
 SPACY_ARGS=
 SPACY_WORKERS=1
+SPACY_GPU=-1
 PIPELINE_PASSWORD=secret
 INDEXER_LANGUAGE=en
 INDEXER_INDEX=hnsw:models/faiss_hnsw.pkl:0:r,flat:models/flat_kbp.pkl:1:rw
