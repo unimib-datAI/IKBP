@@ -87,6 +87,18 @@ services:
     # command: sleep 7200
     # command: python main.py --host 0.0.0.0 --port 80
 
+  consolidation:
+    restart: $RESTART_POLICY
+    #image: rpozzi/blink_nilcluster
+    build:
+        context: ./consolidation
+        dockerfile: Dockerfile
+    volumes:
+      - ./consolidation/main.py:/home/app/main.py
+      - ./consolidation/utils.py:/home/app/utils.py
+    # command: sleep 7200
+    # command: python main.py --host 0.0.0.0 --port 80
+
   nilpredictor:
     restart: $RESTART_POLICY
     #image: rpozzi/blink_nilpredictor
