@@ -87,6 +87,18 @@ services:
     # command: sleep 7200
     # command: python main.py --host 0.0.0.0 --port 80
 
+  interessati:
+    restart: $RESTART_POLICY
+    #image: rpozzi/blink_nilcluster
+    build:
+        context: ./interessati
+        dockerfile: Dockerfile
+    volumes:
+      - ./interessati/main.py:/home/app/main.py
+      - ./interessati/utils.py:/home/app/utils.py
+    # command: sleep 7200
+    # command: python main.py --host 0.0.0.0 --port 80
+
   consolidation:
     restart: $RESTART_POLICY
     #image: rpozzi/blink_nilcluster

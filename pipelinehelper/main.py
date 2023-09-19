@@ -116,6 +116,14 @@ def run(doc, doc_id = None):
             raise Exception('Consolidation error')
         doc = Document.from_dict(res_consolidation.json())
 
+    if 'interessati' in doc.features['pipeline']:
+        print('Skipping interessati: already done')
+    else:
+        res_interessati = requests.post(args.interessati, json=doc.to_dict())
+        if not res_interessati.ok:
+            raise Exception('Interessati error')
+        doc = Document.from_dict(res_interessati.json())
+
     if 'postprocess' in doc.features['pipeline']:
         print('Skipping postprocess: already done')
     else:
@@ -236,6 +244,9 @@ if __name__ == '__main__':
     parser.add_argument(
         "--api-consolidation", type=str, default=None, help="consolidation URL", dest='consolidation', required=False
     )
+    parser.add_argument(
+        "--api-interessati", type=str, default=None, help="interessati URL", dest='interessati', required=False
+    )
 
     args = parser.parse_args()
 
@@ -265,5 +276,7 @@ if __name__ == '__main__':
         args.mongo = args.baseurl + '/api/mongo'
     if args.consolidation is None:
         args.consolidation = args.baseurl + '/api/consolidation'
+    if args.interessati is None:
+        args.interessati = args.baseurl + '/api/interessati/rulebased'
 
     uvicorn.run(app, host = args.host, port = args.port)
