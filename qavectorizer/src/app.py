@@ -244,12 +244,14 @@ def delete_elastic_index(index_name):
 class IndexElasticDocumentRequest(BaseModel):
     doc: dict
 
+def index_elastic_document_raw(doc, index_name):
+    res = es_client.index(index=index_name, document=doc)
+    es_client.indices.refresh(index=index_name)
+    return res["result"]
 
 @app.post("/elastic/index/{index_name}/doc")
 def index_elastic_document(req: IndexElasticDocumentRequest, index_name):
-    res = es_client.index(index=index_name, document=req.doc)
-    es_client.indices.refresh(index=index_name)
-    return res["result"]
+    return index_elastic_document_raw(req.doc, index_name)
     # try:
     #     collection = chroma_client.get_collection(collection_name)
     #     chunks_ids = [str(uuid.uuid4()) for _ in req.embeddings]
@@ -278,6 +280,15 @@ def tipodoc2name(tipo):
         return "Sentenza"
     else:
         return tipo
+    
+
+def anonymize(s, s_type='persona', anonymize_type=["persona"]):
+    if s_type in anonymize_type:
+        words = s.split()
+        new_words = ["".join([word[0]] + ["*" * (len(word) - 1)]) for word in words]
+        return " ".join(new_words)
+    else:
+        return s
 
 @app.post("/elastic/index/{index_name}/doc/mongo")
 def index_elastic_document_mongo(req: IndexElasticDocumentRequest, index_name):
@@ -290,13 +301,32 @@ def index_elastic_document_mongo(req: IndexElasticDocumentRequest, index_name):
             'nomegiudice': 'Nome Giudice',
             'tipodocumento': lambda x: tipodoc2name(x),
             }
-    doc = {}
-    doc['mongo_id'] = IndexElasticDocumentRequest['id']
-    doc['name'] = IndexElasticDocumentRequest['name']
-    doc['text'] = IndexElasticDocumentRequest['text']
-    doc['metadata'] = [{'type': mk, 'value': mv} for mk, mv in IndexElasticDocumentRequest['features'].items() if mk in METADATA_MAP]
 
-    return index_elastic_document(doc, index_name)
+    mongo_doc = req.doc
+
+    doc = {}
+    doc['mongo_id'] = mongo_doc['id']
+    doc['name'] = mongo_doc['name']
+    doc['text'] = mongo_doc['text']
+    doc['metadata'] = [{'type': mk, 'value': mv} for mk, mv in mongo_doc['features'].items() if mk in METADATA_MAP]
+
+    doc['annotations'] = [
+            {
+                "id": cluster["id"],
+                # this will be a real ER id when it exists
+                "id_ER": cluster["id"],
+                "start": 0,
+                "end": 0,
+                "type": cluster["type"],
+                "mention": cluster["title"],
+                "is_linked": bool(cluster.get("url", False)),
+                # this is temporary, there will be a display name directly in the annotaion object
+                "display_name": anonymize(cluster['type'], cluster["title"]),
+            }
+            for cluster in mongo_doc['features']['clusters']['entities_merged']
+        ]
+
+    return index_elastic_document_raw(doc, index_name)
 
 class QueryElasticIndexRequest(BaseModel):
     text: str
