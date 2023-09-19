@@ -443,6 +443,7 @@ if __name__ == "__main__":
     model = SentenceTransformer(settings.embedding_model, device="cuda")
 
     model = model.to(environ.get('SENTENCE_TRANSFORMER_DEVICE', 'cuda'))
+    print('model on device', model.device)
     model = model.eval()
 
     chroma_client = chromadb.Client(

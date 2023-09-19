@@ -29,4 +29,6 @@ def llama_v2_prompt(
     ]
     messages_list.append(f"{BOS}{B_INST} {(messages[-1]['content']).strip()} {E_INST}")
 
+    # print("".join(messages_list))
+
     return "".join(messages_list)
