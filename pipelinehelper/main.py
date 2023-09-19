@@ -108,6 +108,14 @@ def run(doc, doc_id = None):
             raise Exception('Clustering error')
         doc = Document.from_dict(res_clustering.json())
 
+    if 'consolidation' in doc.features['pipeline']:
+        print('Skipping consolidation: already done')
+    else:
+        res_consolidation = requests.post(args.consolidation, json=doc.to_dict())
+        if not res_consolidation.ok:
+            raise Exception('Consolidation error')
+        doc = Document.from_dict(res_consolidation.json())
+
     if 'postprocess' in doc.features['pipeline']:
         print('Skipping postprocess: already done')
     else:
@@ -225,6 +233,9 @@ if __name__ == '__main__':
     parser.add_argument(
         "--api-mongo", type=str, default=None, help="mongo URL", dest='mongo', required=False
     )
+    parser.add_argument(
+        "--api-consolidation", type=str, default=None, help="consolidation URL", dest='consolidation', required=False
+    )
 
     args = parser.parse_args()
 
@@ -252,5 +263,7 @@ if __name__ == '__main__':
         args.postprocess = args.baseurl + '/api/postprocess/doc'
     if args.mongo is None:
         args.mongo = args.baseurl + '/api/mongo'
+    if args.consolidation is None:
+        args.consolidation = args.baseurl + '/api/consolidation'
 
     uvicorn.run(app, host = args.host, port = args.port)

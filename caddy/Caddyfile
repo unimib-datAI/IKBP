@@ -43,5 +43,8 @@ http:// {
 		rewrite * /api/{path}
 		reverse_proxy documents:3001
 	}
+	handle /api/consolidation* {
+		reverse_proxy consolidation:80
+	}
 	respond "404 Not Found" 404
 }
