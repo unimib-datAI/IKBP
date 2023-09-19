@@ -1,4 +1,4 @@
-FROM rpozzi/blink:latest
+FROM rpozzi/blink:devel
 
 # Upgrade PIP
 RUN python3 -m pip install --upgrade pip
