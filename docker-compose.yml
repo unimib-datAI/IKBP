@@ -235,7 +235,13 @@ services:
     restart: $RESTART_POLICY
     environment:
       - xpack.security.enabled=false
-      - "cluster.routing.allocation.disk.watermark.low=90%"
+      ### Avoid test failures due to small disks. NOT SUITABLE FOR PRODUCTION.
+      - cluster.routing.allocation.disk.threshold_enabled=false
+      - cluster.routing.allocation.disk.watermark.low=3mb
+      - cluster.routing.allocation.disk.watermark.high=2mb
+      - cluster.routing.allocation.disk.watermark.flood_stage=1mb
+      - cluster.info.update.interval=1m
+      ###
       - discovery.type=single-node
       - ES_JAVA_OPTS=-Xms4096m -Xmx4096m
     ports:
