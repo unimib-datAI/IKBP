@@ -58,31 +58,44 @@ class ElasticsearchIndexer:
     def create_index(self, name: str):
         return create_elastic_index(name)
 
+    def ogg2name(self, ogg):
+        return self.ogg2name_index.get(ogg, 'UNKNOWN')
+
+    def tipodoc2name(self, tipo):
+        # TODO
+        if tipo == "S":
+            return "Sentenza"
+        else:
+            return tipo
+    
+
     def index(self, index: str, doc: dict):
+        METADATA_MAP = {
+            'annosentenza': 'Anno Sentenza',
+            'annoruolo': 'Anno Rouolo',
+            'codiceoggetto': lambda x: self.ogg2name(x),
+            'parte': 'Parte',
+            'controparte': 'Controparte',
+            'nomegiudice': 'Nome Giudice',
+            'tipodocumento': lambda x: self.tipodoc2name(x),
+            }
+
         annotations = [
             {
-                "id": ann["_id"],
+                "id": cluster["id"],
                 # this will be a real ER id when it exists
-                "id_ER": ann["_id"],
-                "start": ann["start"],
-                "end": ann["end"],
-                "type": ann["type"],
-                "mention": ann["features"]["mention"],
-                "is_linked": ann["features"]["url"] != None
-                and (not ann["features"]["linking"]["is_nil"]),
+                "id_ER": cluster["id"],
+                "start": 0,
+                "end": 0,
+                "type": cluster["type"],
+                "mention": cluster["title"],
+                "is_linked": bool(cluster.get("url", False)),
                 # this is temporary, there will be a display name directly in the annotaion object
-                "display_name": anonymize(ann["features"]["mention"])
-                if ann["type"] in self.anonymize_type
-                else ann["features"]["mention"],
-            }
-            for ann in doc["annotation_sets"]["entities_merged"]["annotations"]
+                "display_name": anonymize(cluster['type'], cluster["title"]),
+            } for cluster in doc['features']['clusters']['entities_merged']
         ]
 
-        metadata = [
-            # for now let's make them static
-            {"type": "anno sentenza", "value": doc["features"].get("annosentenza", "")},
-            {"type": "anno ruolo", "value": doc["features"].get("annoruolo", "")},
-        ]
+        metadata = [{'type': mk, 'value': mv} for mk, mv in doc['features'].items() if mk in METADATA_MAP]
 
         elastic_doc = {
             "mongo_id": doc["id"],
