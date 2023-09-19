@@ -10,3 +10,6 @@
 [submodule "text-generation/src/exllama"]
 	path = text-generation/src/exllama
 	url = https://github.com/turboderp/exllama.git
+[submodule "chroma"]
+	path = chroma
+	url = https://github.com/chroma-core/chroma.git

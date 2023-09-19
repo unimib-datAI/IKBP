@@ -8,3 +8,5 @@ venv
 *.json
 elasticsearch/data
 .swp
+__pycache__
+chroma-volumes
