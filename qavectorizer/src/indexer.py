@@ -91,7 +91,7 @@ class ElasticsearchIndexer:
                 "mention": cluster["title"],
                 "is_linked": bool(cluster.get("url", False)),
                 # this is temporary, there will be a display name directly in the annotaion object
-                "display_name": anonymize(cluster['type'], cluster["title"]),
+                "display_name": anonymize(cluster["title"]),
             } for cluster in doc['features']['clusters']['entities_merged']
         ]
 
