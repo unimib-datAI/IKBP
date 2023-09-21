@@ -236,6 +236,7 @@ services:
               capabilities: [ gpu ]
     environment:
       - MODEL_NAME=${TEXT_GENERATION_MODEL}
+      - GPU_SPLITS=${TEXT_GENERATION_GPU_SPLITS}
     ports:
       - $TEXT_GENERATION_ADDR:7862
     volumes:

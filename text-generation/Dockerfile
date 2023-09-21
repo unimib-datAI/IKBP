@@ -22,4 +22,4 @@ RUN pip install --no-cache-dir -r ./requirements.txt
 
 EXPOSE 7862
 
-CMD python app.py -d ./models/${MODEL_NAME}
+CMD python app.py -d ./models/${MODEL_NAME} -gs "${GPU_SPLITS}"
