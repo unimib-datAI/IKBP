@@ -8,6 +8,8 @@ from actions import (
 )
 from utils import anonymize
 import torch
+from os import environ
+import json
 
 
 class ChromaIndexer:
@@ -54,6 +56,8 @@ class ChromaIndexer:
 class ElasticsearchIndexer:
     def __init__(self, anonymize_type=[]):
         self.anonymize_type = anonymize_type
+        with open(environ.get('OGG2NAME_INDEX'), 'r') as fd:
+            self.ogg2name_index = json.load(fd)
 
     def create_index(self, name: str):
         return create_elastic_index(name)
@@ -67,17 +71,17 @@ class ElasticsearchIndexer:
             return "Sentenza"
         else:
             return tipo
-    
+
 
     def index(self, index: str, doc: dict):
         METADATA_MAP = {
-            'annosentenza': 'Anno Sentenza',
-            'annoruolo': 'Anno Rouolo',
-            'codiceoggetto': lambda x: self.ogg2name(x),
-            'parte': 'Parte',
-            'controparte': 'Controparte',
-            'nomegiudice': 'Nome Giudice',
-            'tipodocumento': lambda x: self.tipodoc2name(x),
+            'annosentenza': lambda x: {'type': 'Anno Sentenza', 'value': x},
+            'annoruolo': lambda x: {'type': 'Anno Rouolo', 'value': x},
+            'codiceoggetto': lambda x: {'type': 'Codice Oggetto', 'value': self.ogg2name(x)},
+            'parte': lambda x: {'type': 'Parte', 'value': x},
+            'controparte': lambda x: {'type': 'Controparte', 'value': x},
+            'nomegiudice': lambda x: {'type': 'Nome Giudice', 'value': x},
+            'tipodocumento': lambda x: {'type': 'Tipo Documento', 'value': self.tipodoc2name(x)},
             }
 
         annotations = [
@@ -91,11 +95,11 @@ class ElasticsearchIndexer:
                 "mention": cluster["title"],
                 "is_linked": bool(cluster.get("url", False)),
                 # this is temporary, there will be a display name directly in the annotaion object
-                "display_name": anonymize(cluster["title"]),
+                "display_name": anonymize(cluster["title"]) if cluster['type'] in self.anonymize_type else cluster['title'],
             } for cluster in doc['features']['clusters']['entities_merged']
         ]
 
-        metadata = [{'type': mk, 'value': mv} for mk, mv in doc['features'].items() if mk in METADATA_MAP]
+        metadata = [METADATA_MAP[mk](mv) for mk, mv in doc['features'].items() if mk in METADATA_MAP]
 
         elastic_doc = {
             "mongo_id": doc["id"],

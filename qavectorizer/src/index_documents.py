@@ -15,7 +15,7 @@ chroma_indexer = ChromaIndexer(
     chunk_size=settings.chunk_size,
     chunk_overlap=settings.chunk_overlap,
 )
-elastic_indexer = ElasticsearchIndexer(anonymize_type=["persona"])
+elastic_indexer = ElasticsearchIndexer(anonymize_type=["persona", "parte", "controparte"])
 
 # create indexes if they do not exist
 chroma_indexer.create_index(INDEX_COLLECTION_NAME)
