@@ -100,9 +100,9 @@ def rulebased_interessati(doc, annset_name='entities_merged'):
         controparte_idx = []
         for ann_id, ann in enumerate(annset):
             if ann.start >= cut_parte[0] and ann.end <= cut_parte[1]:
-                parte_idx.append(ann_id)
+                parte_idx.append(ann.id)
             elif ann.start >= cut_controparte[0] and ann.end <= cut_controparte[1]:
-                controparte_idx.append(ann_id)
+                controparte_idx.append(ann.id)
             else:
                 pass
         
