@@ -61,7 +61,8 @@ def make_clusters(doc_dict, model, annset_name='entities_merged', threshold=0.64
     doc = Document.from_dict(doc_dict)
     annset = doc.annset(annset_name)
     matr_embd = np.array([vector_decode(ann.features['linking']['encoding']) for ann in annset])
-    pairs = np.array(list(itertools.combinations(range(len(annset)), 2)))
+    annset_ids = [a.id for a in annset]
+    pairs = np.array(list(itertools.combinations(annset_ids, 2)))
     # compute similarity
     X_test=[]
     for idx_a, idx_b in pairs:
@@ -73,7 +74,7 @@ def make_clusters(doc_dict, model, annset_name='entities_merged', threshold=0.64
     proba = model.predict_proba(X_test)
     # make graph
     graph = nx.Graph()
-    similarity_matrix = np.identity(len(annset))
+    similarity_matrix = np.identity(max(annset_ids) + 1)
     for p, (idx_a, idx_b) in zip(proba[:,1], pairs):
         similarity_matrix[idx_a, idx_b] = p
         similarity_matrix[idx_b, idx_a] = p
@@ -99,9 +100,9 @@ def make_clusters(doc_dict, model, annset_name='entities_merged', threshold=0.64
     ann_in_cluster = []
     for c_idx, cluster in enumerate(clusters_refine):
         cluster2id[c_idx] = cluster
-        ann_in_cluster += cluster
+        ann_in_cluster.extend(cluster)
     clust_id = max(cluster2id.keys()) + 1
-    for ann_id in range(len(annset)):
+    for ann_id in annset_ids:
         if ann_id not in ann_in_cluster:
             cluster2id[int(clust_id)] = [int(ann_id)]
             clust_id += 1
@@ -118,11 +119,11 @@ def make_clusters(doc_dict, model, annset_name='entities_merged', threshold=0.64
         except:
             pass
         newset = doc.annset('enitites_clustered')
-        for ann_id, ann in enumerate(annset):
-            newset.add(ann.start, ann.end, f'CLUST-{id2cluster[ann_id]}')
+        for ann in annset:
+            newset.add(ann.start, ann.end, f'CLUST-{id2cluster[ann.id]}')
     else:
-        for ann_id, ann in enumerate(annset):
-            annset[ann_id].features['cluster'] = id2cluster[ann_id]
+        for ann in annset:
+            annset[ann.id].features['cluster'] = id2cluster[ann.id]
 
     doc.features['clusters'] = {}
     clusters_info = []
@@ -146,5 +147,5 @@ def make_clusters(doc_dict, model, annset_name='entities_merged', threshold=0.64
     if not 'pipeline' in doc.features:
         doc.features['pipeline'] = []
     doc.features['pipeline'].append('clustering')
-    
+
     return doc
