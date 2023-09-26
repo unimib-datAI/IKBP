@@ -73,7 +73,6 @@ export default (app) => {
 
       // deduplicate sections
       if (annset.name === 'Sections') {
-        console.log('0here');
         const new_anns = [];
         let prev_ann = {};
 
@@ -81,14 +80,23 @@ export default (app) => {
 
         annset.annotations.forEach((ann) => {
           if (ann.type === prev_ann.type) {
+            // found duplicate
             if (ann.end >= prev_ann.end) {
               new_anns.push(ann);
             } else {
               new_anns.push(prev_ann);
             }
+          } else if (Object.keys(prev_ann).length !== 0) {
+            new_anns.push(prev_ann);
           }
           prev_ann = ann;
         });
+        // possible outcomes: 1) prev_ann is a duplicated and a better ann has been already added
+        // 2) prev_ann is not a duplicated and the last ann is of a different type
+        if (new_anns[new_anns.length - 1].type !== prev_ann.type) {
+          // in case of 2)
+          new_anns.push(prev_ann);
+        }
 
         annset.annotations = new_anns;
       }
