@@ -63,7 +63,12 @@ class ElasticsearchIndexer:
         return create_elastic_index(name)
 
     def ogg2name(self, ogg):
-        return self.ogg2name_index.get(ogg, 'UNKNOWN')
+        found = self.ogg2name_index.get(str(ogg))
+        if found:
+            return '{}/{}'.format(found['desc_materia'], found['desc_oggetto'])
+        else:
+            print('UNKNWOWN Metadata for codice oggetto', str(ogg))
+            return 'Codice Oggetto {}'.format(ogg)
 
     def tipodoc2name(self, tipo):
         # TODO
@@ -75,28 +80,30 @@ class ElasticsearchIndexer:
 
     def index(self, index: str, doc: dict):
         METADATA_MAP = {
-            'annosentenza': lambda x: {'type': 'Anno Sentenza', 'value': x},
-            'annoruolo': lambda x: {'type': 'Anno Rouolo', 'value': x},
-            'codiceoggetto': lambda x: {'type': 'Codice Oggetto', 'value': self.ogg2name(x)},
-            'parte': lambda x: {'type': 'Parte', 'value': x},
-            'controparte': lambda x: {'type': 'Controparte', 'value': x},
-            'nomegiudice': lambda x: {'type': 'Nome Giudice', 'value': x},
-            'tipodocumento': lambda x: {'type': 'Tipo Documento', 'value': self.tipodoc2name(x)},
+            'annosentenza': lambda x: {'type': 'Anno Sentenza', 'value': x, "display_name": str(x)},
+            'annoruolo': lambda x: {'type': 'Anno Ruolo', 'value': x, "display_name": str(x)},
+            'codiceoggetto': lambda x: {'type': 'Codice Oggetto', 'value': self.ogg2name(x), "display_name": str(self.ogg2name(x))},
+            'parte': lambda x: {'type': 'Parte', 'value': x, "display_name": str(anonymize(x))},
+            'controparte': lambda x: {'type': 'Controparte', 'value': x, "display_name": str(anonymize(x))},
+            'nomegiudice': lambda x: {'type': 'Nome Giudice', 'value': x, "display_name": str(x)},
+            'tipodocumento': lambda x: {'type': 'Tipo Documento', 'value': self.tipodoc2name(x), "display_name": str(self.tipodoc2name(x))},
             }
 
         annotations = [
             {
                 "id": cluster["id"],
                 # this will be a real ER id when it exists
-                "id_ER": cluster["id"],
+                "id_ER": cluster["url"],
                 "start": 0,
                 "end": 0,
                 "type": cluster["type"],
                 "mention": cluster["title"],
-                "is_linked": bool(cluster.get("url", False)),
+                "is_linked": cluster.get('url') and 'wikipedia.org' in cluster['url'],
                 # this is temporary, there will be a display name directly in the annotaion object
                 "display_name": anonymize(cluster["title"]) if cluster['type'] in self.anonymize_type else cluster['title'],
-            } for cluster in doc['features']['clusters']['entities_merged']
+                "anonymize": cluster['type'] in self.anonymize_type,
+            } for cluster in doc['features']['clusters']['entities_consolidated'] \
+                if cluster["type"] not in ['parte', 'controparte']
         ]
 
         metadata = [METADATA_MAP[mk](mv) for mk, mv in doc['features'].items() if mk in METADATA_MAP]
