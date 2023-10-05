@@ -44,4 +44,12 @@ for domain in domains:
             },
         )
         # index elastic
+
+        # workaround to anonimize
+        sensitive_types = set(['persona', 'parte', 'controparte', 'luogo', 'altro'])
+
+        for ann in current_doc['annotation_sets']['entities_merged']['annotations']:
+            if ann['type'] in sensitive_types or set(ann['features'].get('types', [])).intersection(sensitive_types):
+                current_doc['text'] = current_doc['text'][:ann['start']] + "*" * (ann['end'] - ann['start']) + current_doc['text'][ann['end']:]
+
         elastic_indexer.index(index="test", doc=current_doc)

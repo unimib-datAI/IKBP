@@ -83,8 +83,8 @@ class ElasticsearchIndexer:
             'annosentenza': lambda x: {'type': 'Anno Sentenza', 'value': x, "display_name": str(x)},
             'annoruolo': lambda x: {'type': 'Anno Ruolo', 'value': x, "display_name": str(x)},
             'codiceoggetto': lambda x: {'type': 'Codice Oggetto', 'value': self.ogg2name(x), "display_name": str(self.ogg2name(x))},
-            'parte': lambda x: {'type': 'Parte', 'value': x, "display_name": str(anonymize(x))},
-            'controparte': lambda x: {'type': 'Controparte', 'value': x, "display_name": str(anonymize(x))},
+            # 'parte': lambda x: {'type': 'Parte', 'value': x, "display_name": str(anonymize(x))},
+            # 'controparte': lambda x: {'type': 'Controparte', 'value': x, "display_name": str(anonymize(x))},
             'nomegiudice': lambda x: {'type': 'Nome Giudice', 'value': x, "display_name": str(x)},
             'tipodocumento': lambda x: {'type': 'Tipo Documento', 'value': self.tipodoc2name(x), "display_name": str(self.tipodoc2name(x))},
             }
@@ -102,8 +102,8 @@ class ElasticsearchIndexer:
                 # this is temporary, there will be a display name directly in the annotaion object
                 "display_name": anonymize(cluster["title"]) if cluster['type'] in self.anonymize_type else cluster['title'],
                 "anonymize": cluster['type'] in self.anonymize_type,
-            } for cluster in doc['features']['clusters']['entities_consolidated'] \
-                if cluster["type"] not in ['parte', 'controparte']
+            } for cluster in doc['features']['clusters']['entities_consolidated'] #\
+                # if cluster["type"] not in ['parte', 'controparte']
         ]
 
         metadata = [METADATA_MAP[mk](mv) for mk, mv in doc['features'].items() if mk in METADATA_MAP]
