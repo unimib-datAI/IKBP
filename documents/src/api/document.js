@@ -114,6 +114,28 @@ export default (app) => {
         }
       }
 
+      // WORKAROUND anonymize preview TODO resolve
+      if (annset.name.startsWith('entities_consolidated')) {
+        for (const annot of annset.annotations) {
+          if (['persona', 'parte', 'controparte', 'luogo', 'altro'].includes(annot.type) && annot.start < document.preview.length) {
+            var end = 0;
+            if (annot.end >= document.preview.length) {
+              end = document.preview.length - 1;
+            } else {
+              end = annot.end;
+            }
+            document.preview = document.preview.substring(0, annot.start) + "*".repeat(end - annot.start) + document.preview.substring(end);
+          }
+        }
+      }
+      // WORKAROUND codici fiscali
+      const regexPattern = /[A-Za-z0-9]{16}/;
+
+      document.preview = document.preview.replace(regexPattern, match => '*'.repeat(match.length));
+
+
+      
+
       for (const annot of annset.annotations) {
         // workaround for issue 1 // TODO remove
         if (typeof annot.id === 'string' || annot.id instanceof String) {
@@ -161,6 +183,7 @@ export default (app) => {
         }
       }
     }
+
     return document;
   }
 
