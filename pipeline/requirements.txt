@@ -1,6 +1,6 @@
-pandas
-numpy
 uvicorn
+gunicorn
 fastapi
 requests
 gatenlp
+pyyaml

@@ -1,0 +1,6 @@
+# probably you want to rename this in config.yml
+pipeline:
+  - name: sectionator
+    url: http://127.0.0.1/api/sectionator
+  - name: ner
+    url: http://127.0.0.1/api/ner

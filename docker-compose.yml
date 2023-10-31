@@ -53,11 +53,14 @@ services:
 
   pipeline:
     restart: $RESTART_POLICY
-    build: pipelinehelper
+    build: pipeline
     environment:
-      PIPELINE_ARGS: $PIPELINE_ARGS
+      WORKERS: $PIPELINE_WORKERS
+      TIMEOUT: $PIPELINE_TIMEOUT
     volumes:
-      - ./pipelinehelper/main.py:/home/app/main.py
+      - ./pipeline/main.py:/home/app/main.py
+      - ./pipeline_config.yml:/home/app/config.yml
+    # command: uvicorn main:app --reload --port 80
 
   caddy:
     restart: $RESTART_POLICY
