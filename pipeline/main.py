@@ -1,10 +1,13 @@
 from fastapi import FastAPI, Body
+from fastapi.responses import JSONResponse
 import requests
 from gatenlp import Document
 import yaml
 import datetime
 import os
 import traceback
+
+PIPELINEv = 'pipelineV2'
 
 app = FastAPI()
 
@@ -20,9 +23,54 @@ class PipeException(Exception):
         return f"{self.message}"
 
 @app.post('/api/pipeline')
-async def api_pipeline(doc: dict = Body(...)):
+async def api_pipeline(doc: dict = Body(...), skip: bool | None = True):
+    global config
     gDoc = Document.from_dict(doc)
-    return run_pipeline(gDoc).to_dict()
+
+    if PIPELINEv not in gDoc.features:
+        gDoc.features[PIPELINEv] = {}
+    gDoc.features[PIPELINEv]['pipeline'] = {
+        'date': datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S UTC"),
+        'timestamp': datetime.datetime.utcnow().timestamp(),
+        'result': 'pending',
+    }
+    print('>'*20, flush=True)
+    for pipe in config['pipeline']:
+        # TODO check if pipe already done ??
+        # print(pipe['name'], skip, gDoc.features[PIPELINEv].get(pipe['name'], {}).get('result') == 'ok')
+        if skip and gDoc.features[PIPELINEv].get(pipe['name'], {}).get('result') == 'ok':
+            print('Skipping', pipe['name'], flush=True)
+            gDoc.features[PIPELINEv][pipe['name']]['result'] = 'skipped'
+            continue
+        gDoc.features[PIPELINEv][pipe['name']] = {
+            # 'name': pipe['name'],
+            'url': pipe['url'],
+            'date': datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S UTC"),
+            'timestamp': datetime.datetime.utcnow().timestamp(),
+            'result': 'pending',
+        }
+        try:
+            gDoc = call_pipe(pipe, gDoc)
+        except PipeException as exc_obj:
+            # TODO debug levels
+            gDoc.features[PIPELINEv]['pipeline']['elapsed'] = datetime.datetime.utcnow().timestamp() - gDoc.features[PIPELINEv]['pipeline']['timestamp']
+            pipeline_tb = ''.join(traceback.format_exception(exc_obj))
+            print(pipeline_tb, flush=True)
+            gDoc.features[PIPELINEv]['pipeline']['result'] = 'error'
+            gDoc.features[PIPELINEv]['pipeline']['traceback'] = pipeline_tb
+            print('x'*20, flush=True)
+            return JSONResponse(
+                status_code=500,
+                content=gDoc.to_dict(),
+            )
+
+    gDoc.features[PIPELINEv]['pipeline']['elapsed'] = datetime.datetime.utcnow().timestamp() - gDoc.features[PIPELINEv]['pipeline']['timestamp']
+    gDoc.features[PIPELINEv]['pipeline']['result'] = 'ok'
+    print('<'*20, flush=True)
+    return JSONResponse(
+        status_code=200,
+        content=gDoc.to_dict(),
+    )
 
 def call_pipe(pipe_config, gDoc):
     # TODO debug levels
@@ -31,43 +79,19 @@ def call_pipe(pipe_config, gDoc):
     if not response.ok:
         raise PipeException(response.content)
     doc = response.json()
-    doc['features']['pipelineV2'][pipe_config['name']]['result'] = 'ok'
+    doc['features'][PIPELINEv][pipe_config['name']]['elapsed'] = datetime.datetime.utcnow().timestamp() - doc['features'][PIPELINEv][pipe_config['name']]['timestamp']
+    doc['features'][PIPELINEv][pipe_config['name']]['result'] = 'ok'
     return Document.from_dict(doc)
-
-def run_pipeline(gDoc):
-    global config
-    if 'pipelineV2' not in gDoc.features:
-        gDoc.features['pipelineV2'] = {}
-    gDoc.features['pipelineV2']['pipeline'] = {
-        'time': datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S UTC"),
-        'result': 'pending',
-    }
-    for pipe in config['pipeline']:
-        # TODO check if pipe already done ??
-        gDoc.features['pipelineV2'][pipe['name']] = {
-            # 'name': pipe['name'],
-            'url': pipe['url'],
-            'time': datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S UTC"),
-            'result': 'pending',
-        }
-        try:
-            gDoc = call_pipe(pipe, gDoc)
-        except PipeException as exc_obj:
-            # TODO debug levels
-            pipeline_tb = ''.join(traceback.format_exception(exc_obj))
-            print(pipeline_tb, flush=True)
-            gDoc.features['pipelineV2']['pipeline']['result'] = 'error'
-            gDoc.features['pipelineV2']['pipeline']['traceback'] = pipeline_tb
-            return gDoc
-
-    gDoc.features['pipelineV2']['pipeline']['result'] = 'ok'
-    return gDoc
 
 def load_config(config_path):
     global config
     with open(config_path, 'r') as fd:
         config = yaml.safe_load(fd)
     assert 'pipeline' in config
+    print('Loaded pipeline:')
+    for i, pipe in enumerate(config['pipeline']):
+        print(i, pipe['name'])
+
 
 load_config(os.environ.get('CONFIG_PATH', './config.yml'))
 
