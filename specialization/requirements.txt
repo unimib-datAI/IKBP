@@ -1,6 +1,0 @@
-fastapi
-uvicorn
-gatenlp
-pandas
-python-dotenv
-requests
