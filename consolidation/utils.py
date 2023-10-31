@@ -50,6 +50,11 @@ def reset_cluster_index(clusters, idx_dict, annset):
 def consolidation(doc, annset_name='entities_merged', output_annset_name='entities_consolidated',
                   consolidate_linking=True, consolidate_types=True, merge_same_name=True, merge_similar_name=True):
 
+    if not doc.get('features', {}).get('id'):
+        # TODO get next id from db
+        # now the hash of the first 1000 chars
+        doc['features']['id'] = str(hash(doc['text'][:1000]))
+
     doc['annotation_sets'][output_annset_name] = deepcopy(doc['annotation_sets'][annset_name])
     doc['annotation_sets'][output_annset_name]['name'] = output_annset_name
     doc['features']['clusters'][output_annset_name] = deepcopy(doc['features']['clusters'][annset_name])
