@@ -29,6 +29,7 @@ class _Index:
 #             candidates.append(_c)
 #             scores.append(_s)
 #         return scores, candidates
+
 class HttpIndexer:
     # pass the index as http:example.com:13:r (omit http:// from the url)
     def __init__(self, url, only_indexes=None):
@@ -50,7 +51,7 @@ class HttpIndexer:
             return res.json()
         else:
             print('Http error url', self.url)
-            return None
+            raise ConnectionError('{} {}'.format('Http error url', self.url))
     def id2info(self, body):
         body = dict(body)
         res = requests.post(self.url + '/api/indexer/info', json=body)
