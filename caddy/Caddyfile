@@ -3,6 +3,9 @@ auto_https off
 }
 
 http:// {
+	handle /api/indexer* {
+		reverse_proxy indexer:80
+	}
 	handle /api/pipeline* {
 		reverse_proxy pipeline:80
 	}
