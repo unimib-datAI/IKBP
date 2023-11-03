@@ -15,33 +15,47 @@ chroma_indexer = ChromaIndexer(
     chunk_size=settings.chunk_size,
     chunk_overlap=settings.chunk_overlap,
 )
-elastic_indexer = ElasticsearchIndexer(anonymize_type=["persona", "parte", "controparte"])
+elastic_indexer = ElasticsearchIndexer(anonymize_type=[])
 
 # create indexes if they do not exist
 chroma_indexer.create_index(INDEX_COLLECTION_NAME)
 elastic_indexer.create_index(INDEX_COLLECTION_NAME)
 
 print("Start indexing")
-domains = ["famiglia", "strada", "bancario"]
+domains = ["dummy"]
 # index 100 documents for each domain
 for domain in domains:
-    documents = requests.get(DOCS_BASE_URL + "/api/mongo/document?limit=20&q=" + domain)
+    documents = requests.get(DOCS_BASE_URL + "/api/mongo/document?limit=60")
     documents = documents.json()["docs"]
 
     print("Indexing documents for domain: " + domain)
     for doc in tqdm(documents):
-        doc_id = doc["id"]
-        # retrieve a full document
-        current_doc = retriever.retrieve(doc_id)
-        # # index chunks for the document
-        chroma_indexer.index(
-            collection="test",
-            doc=current_doc,
-            metadata={
-                "doc_id": doc_id,
-                "chunk_size": settings.chunk_size,
-                "domain": domain,
-            },
-        )
-        # index elastic
-        elastic_indexer.index(index="test", doc=current_doc)
+        try:
+            doc_id = doc["id"]
+            # retrieve a full document
+            current_doc = retriever.retrieve(doc_id)
+            newtext = ''
+            corpo = False
+            for line in current_doc['text'].split('\n'):
+                if line.startswith('---------------------------'):
+                    corpo = False
+                if corpo and line:
+                    newtext += line + '\n'
+                if line.startswith('Corpo:'):
+                    corpo = True
+            newtext = newtext[:-1]
+            current_doc['text'] = newtext
+            # # index chunks for the document
+            chroma_indexer.index(
+                collection="test",
+                doc=current_doc,
+                metadata={
+                    "doc_id": doc_id,
+                    "chunk_size": settings.chunk_size,
+                    "domain": domain,
+                },
+            )
+            # index elastic
+            elastic_indexer.index(index="test", doc=current_doc)
+        except Exception as e:
+            print('error with doc', doc['id'], e)

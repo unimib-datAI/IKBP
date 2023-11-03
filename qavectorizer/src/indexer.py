@@ -96,7 +96,7 @@ class ElasticsearchIndexer:
                 "is_linked": bool(cluster.get("url", False)),
                 # this is temporary, there will be a display name directly in the annotaion object
                 "display_name": anonymize(cluster["title"]) if cluster['type'] in self.anonymize_type else cluster['title'],
-            } for cluster in doc['features']['clusters']['entities_merged']
+            } for cluster in doc['features']['clusters']['entities_consolidated']
         ]
 
         metadata = [METADATA_MAP[mk](mv) for mk, mv in doc['features'].items() if mk in METADATA_MAP]
