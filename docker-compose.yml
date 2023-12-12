@@ -40,7 +40,7 @@ services:
       context: ./biencoder
       dockerfile: Dockerfile
     volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - ./models:/home/app/models
       - ./biencoder/main.py:/home/app/main.py
     environment:
       PYTHONPATH: /home/app
@@ -61,7 +61,7 @@ services:
         context: ./indexer
         dockerfile: Dockerfile
     volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - ./models:/home/app/models
       - ./indexer/main.py:/home/app/main.py
     environment:
       INDEXER_INDEX: $INDEXER_INDEX
@@ -81,7 +81,7 @@ services:
     volumes:
       - ./clustering/main.py:/home/app/main.py
       - ./clustering/utils.py:/home/app/utils.py
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - ./models:/home/app/models
     environment:
       CLUSTERING_MODEL: $CLUSTERING_MODEL
     # command: sleep 7200
@@ -118,7 +118,7 @@ services:
         context: ./nilpredictor
         dockerfile: Dockerfile
     volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - ./models:/home/app/models
       - ./nilpredictor/main.py:/home/app/main.py
     environment:
       NILPREDICTOR_ARGS: $NILPREDICTOR_ARGS
@@ -130,7 +130,7 @@ services:
       context: ./sectionator
       dockerfile: Dockerfile
     volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - ./models:/home/app/models
       - ./sectionator/main.py:/home/app/main.py
     environment:
       DISTRIBUZIONE_TERRITORIALE_UFFICI: $SECTIONATOR_DISTRIBUZIONE_TERRITORIALE_UFFICI
@@ -141,7 +141,7 @@ services:
       context: ./specialization
       dockerfile: Dockerfile
     volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - ./models:/home/app/models
       - ./specialization/main.py:/home/app/main.py
       - ./specialization/fakeCandidates.py:/home/app/fakeCandidates.py
     environment:
@@ -167,7 +167,7 @@ services:
       SPACY_TIMEOUT: $SPACY_TIMEOUT
       SPACY_GPU: $SPACY_GPU
     volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - ./models:/home/app/models
       - ./spacyner/main.py:/home/app/main.py
     deploy:
       resources:
@@ -224,10 +224,14 @@ services:
       - ./giustizia-ui/pages:/app/pages
         #command: sleep 7200
 
-  text-generation:
-    build:
-      context: ./text-generation
-      dockerfile: Dockerfile
+  localai:
+    image: quay.io/go-skynet/local-ai:v2.0.0-cublas-cuda11
+    tty: true # enable colorized logs
+    restart: $RESTART_POLICY
+    volumes:
+      - ./models/localai/models:/models
+      - ./models/localai/images/:/tmp/generated/images/
+    command: ["/usr/bin/local-ai" ]
     deploy:
       resources:
         reservations:
@@ -240,8 +244,8 @@ services:
     ports:
       - $TEXT_GENERATION_ADDR:7862
     volumes:
-      - ./models/text-generation:/workspace/models
-      # - ./text-generation/src:/workspace
+      - ./models/neration:/workspace/models
+      # - ./neration/src:/workspace
 
   es:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.7.0
