@@ -243,6 +243,23 @@ services:
       - ./models/text-generation:/workspace/models
       # - ./text-generation/src:/workspace
 
+  localai:
+    image: quay.io/go-skynet/local-ai:v2.0.0-cublas-cuda11
+    tty: true # enable colorized logs
+    restart: $RESTART_POLICY
+    volumes:
+      - ./models/localai/models:/models
+      - ./models/localai/images/:/tmp/generated/images/
+    command: ["/usr/bin/local-ai" ]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [ gpu ]
+    ports:
+      - $LOCALAI_ADDR:7862
+
   es:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.7.0
     restart: $RESTART_POLICY
