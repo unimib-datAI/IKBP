@@ -1,1 +1,0 @@
-From https://github.com/dhfbk/tint

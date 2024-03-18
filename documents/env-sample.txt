@@ -1,3 +1,0 @@
-PORT=3001
-MONGO=mongodb://user:password@localhost:27017/main
-ENABLE_AUTH=false

@@ -1,6 +1,12 @@
 version: "3"
 services:
 
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    ports:
+      - $RABBIT_ADDR:5672
+      - $RABBIT_MANAGEMENT_ADDR:15672
+
   postgres:
     restart: $RESTART_POLICY
     image: postgres:14
@@ -9,29 +15,6 @@ services:
     volumes:
       - ./postgres/data:/var/lib/postgresql/data
       - "./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql"
-
-  mongo:
-    restart: $RESTART_POLICY
-    image: mongo:4.4.6 # mongo 5 requires cpu supports AVX
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: $MONGO_ROOT_PASSWORD
-      MONGO_INITDB_DATABASE: main
-      MONGO_INITDB_USERNAME: usr
-      MONGO_INITDB_PASSWORD: $MONGO_PASSWORD
-    volumes:
-      - ./mongo/data:/data/db
-      - ./mongo/initdb.d:/docker-entrypoint-initdb.d/
-
-  documents:
-    restart: $RESTART_POLICY
-    build: documents
-    environment:
-      PORT: 3001
-      ENABLE_AUTH: false
-      MONGO: mongodb://usr:$MONGO_PASSWORD@mongo:27017/main
-    volumes:
-      - ./documents/src:/app/src
 
   biencoder:
     restart: $RESTART_POLICY
@@ -135,19 +118,6 @@ services:
     environment:
       DISTRIBUZIONE_TERRITORIALE_UFFICI: $SECTIONATOR_DISTRIBUZIONE_TERRITORIALE_UFFICI
 
-  specialization:
-    restart: $RESTART_POLICY
-    build:
-      context: ./specialization
-      dockerfile: Dockerfile
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-      - ./specialization/main.py:/home/app/main.py
-      - ./specialization/fakeCandidates.py:/home/app/fakeCandidates.py
-    environment:
-      PIPELINE_ADDRESS: $PIPELINE_ADDRESS
-      # command: sleep 7200
-
   pipeline:
     restart: $RESTART_POLICY
     build: pipelinehelper
@@ -155,174 +125,4 @@ services:
       PIPELINE_ARGS: $PIPELINE_ARGS
     volumes:
       - ./pipelinehelper/main.py:/home/app/main.py
-
-  spacyner:
-    restart: $RESTART_POLICY
-    build: ./spacyner
-    environment:
-      SPACY_MODEL: $SPACY_MODEL
-      SPACY_TAG: $SPACY_TAG
-      SPACY_SENTER: $SPACY_SENTER
-      SPACY_WORKERS: $SPACY_WORKERS
-      SPACY_TIMEOUT: $SPACY_TIMEOUT
-      SPACY_GPU: $SPACY_GPU
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-      - ./spacyner/main.py:/home/app/main.py
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [ gpu ]
-    # command: python __main__.py --host 0.0.0.0 --port 80 --model $SPACY_MODEL
-
-  caddy:
-    restart: $RESTART_POLICY
-    image: caddy:2
-    ports:
-      - "$CADDY_LISTEN_HTTP:80"
-    volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
-      - ./caddy/site:/srv
-      - ./caddy/data:/data
-      - ./caddy/config:/config
-
-  ui:
-    restart: $RESTART_POLICY
-    build:
-      context: giustizia-ui
-      args:
-        ACCESS_USERNAME: $UI_ACCESS_USERNAME
-        ACCESS_PASSWORD: $UI_ACCESS_PASSWORD
-        API_BASE_URI: ${PIPELINE_ADDRESS}/api
-        API_USERNAME: ""
-        API_PASSWORD: ""
-        NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
-        NEXTAUTH_URL: $UI_NEXTAUTH_URL
-        NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
-        NEXT_PUBLIC_FULL_PATH: $UI_NEXT_PUBLIC_FULL_PATH
-        API_LLM: $UI_API_LLM
-        API_INDEXER: $UI_API_INDEXER
-    ports:
-      - $LISTEN_UI:3000
-    environment:
-      ACCESS_USERNAME: $UI_ACCESS_USERNAME
-      ACCESS_PASSWORD: $UI_ACCESS_PASSWORD
-      API_BASE_URI: ${PIPELINE_ADDRESS}/api
-      API_USERNAME: ""
-      API_PASSWORD: ""
-      NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
-      NEXTAUTH_URL: $UI_NEXTAUTH_URL
-      NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
-      NEXT_PUBLIC_FULL_PATH: $UI_NEXT_PUBLIC_FULL_PATH
-      API_LLM: $UI_API_LLM
-      API_INDEXER: $UI_API_INDEXER
-
-    volumes:
-      - ./giustizia-ui/modules:/app/modules
-      - ./giustizia-ui/server:/app/server
-      - ./giustizia-ui/pages:/app/pages
-        #command: sleep 7200
-
-  text-generation:
-    build:
-      context: ./text-generation
-      dockerfile: Dockerfile
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              capabilities: [ gpu ]
-    environment:
-      - MODEL_NAME=${TEXT_GENERATION_MODEL}
-      - GPU_SPLITS=${TEXT_GENERATION_GPU_SPLITS}
-    ports:
-      - $TEXT_GENERATION_ADDR:7862
-    volumes:
-      - ./models/text-generation:/workspace/models
-      # - ./text-generation/src:/workspace
-
-  es:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.7.0
-    restart: $RESTART_POLICY
-    environment:
-      - xpack.security.enabled=false
-      ### Avoid test failures due to small disks. NOT SUITABLE FOR PRODUCTION.
-      - cluster.routing.allocation.disk.threshold_enabled=false
-      - cluster.routing.allocation.disk.watermark.low=3mb
-      - cluster.routing.allocation.disk.watermark.high=2mb
-      - cluster.routing.allocation.disk.watermark.flood_stage=1mb
-      - cluster.info.update.interval=1m
-      ###
-      - discovery.type=single-node
-      - ES_JAVA_OPTS=-Xms4096m -Xmx4096m
-    ports:
-      - ${ELASTIC_PORT}:${ELASTIC_PORT}
-    volumes:
-      - ./elasticsearch/data:/usr/share/elasticsearch/data
-
-  qavectorizer:
-    build:
-      context: ./qavectorizer
-      dockerfile: Dockerfile
-    depends_on:
-      - es
-    restart: $RESTART_POLICY
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              capabilities: [ gpu ]
-    environment:
-      - HOST_BASE_URL=${HOST_BASE_URL}
-      - INDEXER_SERVER_PORT=7863
-      - DOCS_PORT=${DOCS_PORT}
-      - CHROMA_PORT=${CHROMA_PORT}
-      - ELASTIC_PORT=${ELASTIC_PORT}
-      - SENTENCE_TRANSFORMER_EMBEDDING_MODEL=${SENTENCE_TRANSFORMER_EMBEDDING_MODEL}
-      - SENTENCE_TRANSFORMER_DEVICE=${SENTENCE_TRANSFORMER_DEVICE}
-      - OGG2NAME_INDEX=${OGG2NAME_INDEX}
-    ports:
-      - ${QAVECTORIZER_ADDR}:7863
-    volumes:
-      - ./qavectorizer/src:/workspace
-      - ./models:/root/models
-      - ./models/qavectorizer:/root/.cache/huggingface
-
-######
-
-  chroma:
-    build:
-      context: chroma/chroma
-      dockerfile: Dockerfile
-    volumes:
-      - ./chroma/chroma:/chroma
-      - ./chroma-volumes/index_data:/chroma/.chroma/index
-    command: uvicorn chromadb.app:app --reload --workers 1 --host 0.0.0.0 --port 8000 --log-config log_config.yml
-    environment:
-      - CHROMA_DB_IMPL=clickhouse
-      - CLICKHOUSE_HOST=clickhouse
-      - CLICKHOUSE_PORT=8123
-    ports:
-      - ${CROMA_LISTEN_ADDR}:8000
-    depends_on:
-      - clickhouse
-
-  clickhouse:
-    image: clickhouse/clickhouse-server:22.9-alpine
-    environment:
-      - ALLOW_EMPTY_PASSWORD=yes
-      - CLICKHOUSE_TCP_PORT=9000
-      - CLICKHOUSE_HTTP_PORT=8123
-        #ports:
-        #- '8123:8123'
-        #- '9000:9000'
-    volumes:
-      - ./chroma-volumes/clickhouse/data:/var/lib/clickhouse
-      - ./chroma-volumes/clickhouse/logs:/var/log/clickhouse-server
-      - ./chroma-volumes/clickhouse/backups:/backups
-      - ./chroma/chroma/config/backup_disk.xml:/etc/clickhouse-server/config.d/backup_disk.xml
-      - ./chroma/chroma/config/chroma_users.xml:/etc/clickhouse-server/users.d/chroma.xml
 

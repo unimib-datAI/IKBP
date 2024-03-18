@@ -1,0 +1,8 @@
+version: "3"
+services:
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    ports:
+      - $RABBIT_ADDR:5672
+      - $RABBIT_MANAGEMENT_ADDR:15672
+

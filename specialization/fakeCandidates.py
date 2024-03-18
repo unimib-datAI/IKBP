@@ -1,4 +1,0 @@
-fake_candidates = [
-  {"mention": "TRIBUNALE ORDINARIO di MILANO", "mention_type": "TRIBUNALE", "text": "giudice tutelare, TRIBUNALE ORDINARIO di MILANO PRIMA BIS SEZIONE CIVILE in composizione", "offset_doc_start": 21, "offset_doc_end": 50, "offset_ex_start": 18, "offset_ex_end": 47, "doc_id": 12, "id": 0, "predict_proba": 0.08056779205799103},
-  {"mention": "TRIBUNALE ORDINARIO di ROMA", "mention_type": "TRIBUNALE", "text": "giudice tutelare, TRIBUNALE ORDINARIO di ROMA PRIMA BIS SEZIONE CIVILE in composizione", "offset_doc_start": 21, "offset_doc_end": 50, "offset_ex_start": 18, "offset_ex_end": 47, "doc_id": 12, "id": 0, "predict_proba": 0.08056779205799103},
-]
