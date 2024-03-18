@@ -120,9 +120,10 @@ services:
 
   pipeline:
     restart: $RESTART_POLICY
-    build: pipelinehelper
+    build: pipeline
     environment:
-      PIPELINE_ARGS: $PIPELINE_ARGS
+      WORKERS: $PIPELINE_WORKERS
+      TIMEOUT: $PIPELINE_TIMEOUT
     volumes:
       - ./pipelinehelper/main.py:/home/app/main.py
 
