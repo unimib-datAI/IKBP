@@ -12,6 +12,7 @@ import logging
 from torch.utils.data import DataLoader, SequentialSampler
 from gatenlp import Document
 import pika
+from func_timeout import func_timeout, FunctionTimedOut
 
 QUEUES = {
     'doc_in': '{root}/doc/in',
@@ -171,9 +172,21 @@ def load_models(args):
 
 def queue_doc_in_callback(ch, method, properties, body):
     print("[x] Received doc")
-    doc = encode_mention_from_doc(body)
-    ch.basic_publish(exchange='', routing_key=QUEUES['doc_out'], body=doc)
-    ch.basic_ack(delivery_tag=method.delivery_tag)
+    try:
+        doc = func_timeout(TIMEOUT, encode_mention_from_doc, args=(body))
+
+        ch.basic_publish(exchange='', routing_key=QUEUES['doc_out'], body=doc)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    except FunctionTimedOut:
+        print("DOC could not complete within timeout and was terminated.")
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+
+        ch.basic_publish(exchange='', routing_key=QUEUES['errors'], body={
+            'from': QUEUES['doc_in'],
+            'body': body
+        })
+
 
 def queue_entity_in_callback(ch, method, properties, body):
     print("[x] Received entity")
@@ -212,6 +225,9 @@ if __name__ == '__main__':
     parser.add_argument(
         "--queue", type=str, default="biencoder", help="rabbitmq queue root",
     )
+    parser.add_argument(
+        "--timeout", type=int, default=30, help="timeout in seconds",
+    )
 
     args = parser.parse_args()
 
@@ -225,15 +241,17 @@ if __name__ == '__main__':
     # RabbitMQ connection parameters
     RMQ_URL = args.rabbiturl
     QUEUE_ROOT = args.queue
+    TIMEOUT = args.timeout
 
     QUEUES = {
-    'doc_in': '{root}/doc/in',
-    'doc_out': '{root}/doc/out',
-    'mention_in': '{root}/mention/in',
-    'mention_out': '{root}/mention/out',
-    'entity_in': '{root}/entity/in',
-    'entity_out': '{root}/entity/out',
-}
+        'doc_in': '{root}/doc/in',
+        'doc_out': '{root}/doc/out',
+        'mention_in': '{root}/mention/in',
+        'mention_out': '{root}/mention/out',
+        'entity_in': '{root}/entity/in',
+        'entity_out': '{root}/entity/out',
+        'errors': '{root}/errors'
+    }
     
     for k in QUEUES:
         QUEUES[k] = QUEUES[k].format(root=QUEUE_ROOT)
@@ -250,6 +268,7 @@ if __name__ == '__main__':
     channel.queue_declare(queue=QUEUES['doc_in'])
     channel.queue_declare(queue=QUEUES['mention_in'])
     channel.queue_declare(queue=QUEUES['entity_in'])
+    channel.queue_declare(queue=QUEUES['errors'])
 
     # Set up the consumer
     channel.basic_consume(queue=QUEUES['doc_in'], on_message_callback=queue_doc_in_callback, auto_ack=False)

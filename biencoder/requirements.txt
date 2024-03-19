@@ -30,3 +30,4 @@ pandas
 # supervisor
 gatenlp
 pika
+func-timeout
