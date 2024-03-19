@@ -29,6 +29,9 @@ services:
       PYTHONPATH: /home/app
       BIENCODER_MODEL: $BIENCODER_MODEL
       BIENCODER_CONFIG: $BIENCODER_CONFIG
+      BIENCODER_TIMEOUT: $BIENCODER_TIMEOUT
+      RABBITURL: $RABBITURL
+      RMQ_BIENCODER: $RMQ_BIENCODER
     deploy:
       resources:
         reservations:

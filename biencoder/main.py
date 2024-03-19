@@ -12,7 +12,7 @@ import logging
 from torch.utils.data import DataLoader, SequentialSampler
 from gatenlp import Document
 import pika
-from func_timeout import func_timeout, FunctionTimedOut
+import timeout_decorator
 
 QUEUES = {
     'doc_in': '{root}/doc/in',
@@ -172,20 +172,27 @@ def load_models(args):
 
 def queue_doc_in_callback(ch, method, properties, body):
     print("[x] Received doc")
-    try:
-        doc = func_timeout(TIMEOUT, encode_mention_from_doc, args=(body))
+    body = json.loads(body.decode())
 
-        ch.basic_publish(exchange='', routing_key=QUEUES['doc_out'], body=doc)
+    @timeout_decorator.timeout(TIMEOUT)
+    def timeout_encode_mention_from_doc(body):
+        return encode_mention_from_doc(body)
+
+    try:
+        #doc = func_timeout(TIMEOUT, encode_mention_from_doc, args=(body))
+        doc = timeout_encode_mention_from_doc(body)
+
+        ch.basic_publish(exchange='', routing_key=QUEUES['doc_out'], body=json.dumps(doc))
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    except FunctionTimedOut:
+    except timeout_decorator.TimeoutError:
         print("DOC could not complete within timeout and was terminated.")
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
-        ch.basic_publish(exchange='', routing_key=QUEUES['errors'], body={
+        ch.basic_publish(exchange='', routing_key=QUEUES['errors'], body=json.dumps({
             'from': QUEUES['doc_in'],
             'body': body
-        })
+        }))
 
 
 def queue_entity_in_callback(ch, method, properties, body):
@@ -265,9 +272,17 @@ if __name__ == '__main__':
     connection = pika.BlockingConnection(pika.URLParameters(RMQ_URL))
     channel = connection.channel()
 
+
+    channel.basic_qos(prefetch_count=1)
+
     channel.queue_declare(queue=QUEUES['doc_in'])
     channel.queue_declare(queue=QUEUES['mention_in'])
     channel.queue_declare(queue=QUEUES['entity_in'])
+
+    channel.queue_declare(queue=QUEUES['doc_out'])
+    channel.queue_declare(queue=QUEUES['mention_out'])
+    channel.queue_declare(queue=QUEUES['entity_out'])
+
     channel.queue_declare(queue=QUEUES['errors'])
 
     # Set up the consumer

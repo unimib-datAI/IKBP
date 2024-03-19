@@ -30,4 +30,5 @@ pandas
 # supervisor
 gatenlp
 pika
-func-timeout
+pydantic==1.10.9
+timeout-decorator
