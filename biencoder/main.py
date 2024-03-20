@@ -263,11 +263,6 @@ if __name__ == '__main__':
     for k in QUEUES:
         QUEUES[k] = QUEUES[k].format(root=QUEUE_ROOT)
 
-    # Callback function to handle received messages
-    def callback(ch, method, properties, body):
-        ch.basic_ack(delivery_tag=method.delivery_tag)
-        print(" [x] Received %r" % body)
-
     # Connect to RabbitMQ server
     connection = pika.BlockingConnection(pika.URLParameters(RMQ_URL))
     channel = connection.channel()
