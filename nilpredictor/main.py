@@ -1,13 +1,14 @@
 import pickle
 import pandas as pd
-from fastapi import FastAPI, Body
 from pydantic import BaseModel
-import uvicorn
 from typing import List, Optional
 import argparse
 import textdistance
 import statistics
 from gatenlp import Document
+import pika
+import timeout_decorator
+import traceback
 
 # input: features
 # output: NIL score
@@ -38,10 +39,7 @@ class Features(BaseModel):
     topcandidates: Optional[List[Candidate]]
     secondiff: Optional[float]
 
-app = FastAPI()
-
-@app.post('/api/nilprediction/doc')
-async def nilprediction_doc_api(doc: dict = Body(...)):
+def nilprediction_doc_api(doc: dict):
     doc = Document.from_dict(doc)
 
     annsets_to_link = set([doc.features.get('annsets_to_link', 'entities_merged')])
@@ -104,8 +102,7 @@ async def nilprediction_doc_api(doc: dict = Body(...)):
 
     return doc.to_dict()
 
-@app.post('/api/nilprediction')
-async def nilprediction_api(input: List[Features]):
+def nilprediction_api(input: List[Features]):
     return run(input)
 
 def run(input: List[Features]):
@@ -216,16 +213,46 @@ def load_nil_models(args, logger=None):
 
     return nil_bi_model, nil_bi_features, nil_model, nil_features
 
+################## rmq
+
+def queue_doc_in_callback(ch, method, properties, body):
+    print("[x] Received doc")
+    body = json.loads(body.decode())
+
+    @timeout_decorator.timeout(TIMEOUT)
+    def timeout_nilprediction_doc_api(body):
+        return nilprediction_doc_api(body)
+
+    try:
+        doc = timeout_nilprediction_doc_api(body)
+
+        ch.basic_publish(exchange='', routing_key=QUEUES['doc_out'], body=json.dumps(doc))
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    except timeout_decorator.TimeoutError:
+        print("DOC could not complete within timeout and was terminated.")
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+
+        ch.basic_publish(exchange='', routing_key=QUEUES['errors'], body=json.dumps({
+            'from': QUEUES['doc_in'],
+            'reason': 'timeout',
+            'body': body
+        }))
+    except Exception as exc_obj:
+        pipeline_tb = traceback.format_exc()
+        print("DOC exception:", pipeline_tb)
+
+        ch.basic_publish(exchange='', routing_key=QUEUES['errors'], body=json.dumps({
+            'from': QUEUES['doc_in'],
+            'reason': pipeline_tb,
+            'body': body
+        }))
+
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "--host", type=str, default="127.0.0.1", help="host to listen at",
-    )
-
-    parser.add_argument(
-        "--port", type=int, default="30303", help="port to listen at",
-    )
 
     parser.add_argument(
         "--nil-bi-model", type=str, default=None, help="path to nil bi model",
@@ -246,6 +273,15 @@ if __name__ == '__main__':
     parser.add_argument(
         "--threshold", type=float, default="0.5", help="threshold below which mention is nil",
     )
+    parser.add_argument(
+        "--rabbiturl", type=str, default='amqp://guest:guest@rabbitmq:5672/', help="rabbitmq url",
+    )
+    parser.add_argument(
+        "--queue", type=str, default="nilpred", help="rabbitmq queue root",
+    )
+    parser.add_argument(
+        "--timeout", type=int, default=30, help="timeout in seconds",
+    )
 
     args = parser.parse_args()
 
@@ -253,4 +289,41 @@ if __name__ == '__main__':
     nil_bi_model, nil_bi_features, nil_model, nil_features = load_nil_models(args)
     print('Loading complete.')
 
-    uvicorn.run(app, host = args.host, port = args.port)
+    # RabbitMQ connection parameters
+    RMQ_URL = args.rabbiturl
+    QUEUE_ROOT = args.queue
+    TIMEOUT = args.timeout
+
+    QUEUES = {
+        'doc_in': '{root}/doc/in',
+        'doc_out': '{root}/doc/out',
+        'list_in': '{root}/list/in',
+        'list_out': '{root}/list/out',
+        'errors': '{root}/errors'
+    }
+    
+    for k in QUEUES:
+        QUEUES[k] = QUEUES[k].format(root=QUEUE_ROOT)
+
+    # Connect to RabbitMQ server
+    connection = pika.BlockingConnection(pika.URLParameters(RMQ_URL))
+    channel = connection.channel()
+
+
+    channel.basic_qos(prefetch_count=1)
+
+    channel.queue_declare(queue=QUEUES['doc_in'])
+    channel.queue_declare(queue=QUEUES['list_in'])
+
+    channel.queue_declare(queue=QUEUES['doc_out'])
+    channel.queue_declare(queue=QUEUES['list_out'])
+
+    channel.queue_declare(queue=QUEUES['errors'])
+
+    # Set up the consumer
+    channel.basic_consume(queue=QUEUES['doc_in'], on_message_callback=queue_doc_in_callback, auto_ack=False)
+    # channel.basic_consume(queue=QUEUES['list_in'], on_message_callback=queue_list_in_callback, auto_ack=False)
+
+    print(' [*] Waiting for messages. To exit press CTRL+C')
+    # Start consuming messages
+    channel.start_consuming()

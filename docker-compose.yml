@@ -31,7 +31,7 @@ services:
       - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
       - ./spacyner/main.py:/home/app/main.py
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         reservations:
           devices:
@@ -116,6 +116,9 @@ services:
       - ./nilpredictor/main.py:/home/app/main.py
     environment:
       NILPREDICTOR_ARGS: $NILPREDICTOR_ARGS
+      NILPREDICTOR_TIMEOUT: $BIENCODER_TIMEOUT
+      RABBITURL: $RABBITURL
+      RMQ_BIENCODER: $RMQ_BIENCODER
     # command: python main.py --host 0.0.0.0 --port 80 $NILPREDICTOR_ARGS
 
   sectionator:
