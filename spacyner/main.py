@@ -7,6 +7,7 @@ from gatenlp import Document
 import pika
 import timeout_decorator
 import json
+import traceback
 
 DEFAULT_TAG='aplha_v0.1.0_spacy'
 model = ''
@@ -117,9 +118,19 @@ def queue_doc_in_callback(ch, method, properties, body):
 
         ch.basic_publish(exchange='', routing_key=QUEUES['errors'], body=json.dumps({
             'from': QUEUES['doc_in'],
+            'reason': 'timeout',
             'body': body
         }))
+    except Exception as exc:
+        pipeline_tb = ''.join(traceback.format_exception(exc_obj))
+        print("DOC exception:", pipeline_tb)
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
+        ch.basic_publish(exchange='', routing_key=QUEUES['errors'], body=json.dumps({
+            'from': QUEUES['doc_in'],
+            'reason': pipeline_tb,
+            'body': body
+        }))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
