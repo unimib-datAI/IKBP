@@ -1,11 +1,12 @@
 import argparse
-from fastapi import FastAPI, Body
 from pydantic import BaseModel
-import uvicorn
 import spacy
 from spacy.cli import download as spacy_download
 import os
 from gatenlp import Document
+import pika
+import timeout_decorator
+import json
 
 DEFAULT_TAG='aplha_v0.1.0_spacy'
 model = ''
@@ -17,13 +18,10 @@ gpu_id = -1
 class Item(BaseModel):
     text: str
 
-app = FastAPI()
-
 def restructure_newline(text):
   return text.replace('\n', ' ')
 
-@app.post('/api/spacyner')
-async def encode_mention(doc: dict = Body(...)):
+def encode_mention(doc: dict):
     global model
     global senter
     global tag
@@ -96,14 +94,35 @@ def initialize():
     print('Loading complete.')
 
 
+################## rmq
+
+def queue_doc_in_callback(ch, method, properties, body):
+    print("[x] Received doc")
+    body = json.loads(body.decode())
+
+    @timeout_decorator.timeout(TIMEOUT)
+    def timeout_encode_mention(body):
+        return encode_mention(body)
+
+    try:
+        #doc = func_timeout(TIMEOUT, encode_mention_from_doc, args=(body))
+        doc = timeout_encode_mention(body)
+
+        ch.basic_publish(exchange='', routing_key=QUEUES['doc_out'], body=json.dumps(doc))
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    except timeout_decorator.TimeoutError:
+        print("DOC could not complete within timeout and was terminated.")
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+
+        ch.basic_publish(exchange='', routing_key=QUEUES['errors'], body=json.dumps({
+            'from': QUEUES['doc_in'],
+            'body': body
+        }))
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--host", type=str, default="127.0.0.1", help="host to listen at",
-    )
-    parser.add_argument(
-        "--port", type=int, default="30304", help="port to listen at",
-    )
     parser.add_argument(
         "--model", type=str, default="en_core_web_sm", help="spacy model to load",
     )
@@ -116,6 +135,15 @@ if __name__ == '__main__':
     parser.add_argument(
         "--gpu-id", type=int, default=-1, help="Spacy GPU id",
     )
+    parser.add_argument(
+        "--rabbiturl", type=str, default='amqp://guest:guest@rabbitmq:5672/', help="rabbitmq url",
+    )
+    parser.add_argument(
+        "--queue", type=str, default="spacyner", help="rabbitmq queue root",
+    )
+    parser.add_argument(
+        "--timeout", type=int, default=30, help="timeout in seconds",
+    )
 
     args = parser.parse_args()
 
@@ -123,13 +151,43 @@ if __name__ == '__main__':
     senter = args.sents
     tag = args.tag
     gpu_id = args.gpu_id
+    TIMEOUT = args.timeout
 
     initialize()
 
-    uvicorn.run(app, host = args.host, port = args.port)
-else:
-    model = os.environ.get('SPACY_MODEL')
-    senter = os.environ.get('SPACY_SENTER', False)
-    tag = os.environ.get('SPACY_TAG', 'merged')
-    gpu_id = int(os.environ.get('SPACY_GPU', -1))
-    initialize()
+    # RabbitMQ connection parameters
+    RMQ_URL = args.rabbiturl
+    QUEUE_ROOT = args.queue
+    TIMEOUT = args.timeout
+
+    QUEUES = {
+        'doc_in': '{root}/doc/in',
+        'doc_out': '{root}/doc/out',
+        'errors': '{root}/errors'
+    }
+    
+    for k in QUEUES:
+        QUEUES[k] = QUEUES[k].format(root=QUEUE_ROOT)
+
+    # Connect to RabbitMQ server
+    parameters = pika.URLParameters(RMQ_URL)
+    parameters.heartbeat = TIMEOUT + 1
+    parameters.blocked_connection_timeout = TIMEOUT + 1
+    connection = pika.BlockingConnection(parameters)
+    channel = connection.channel()
+
+
+    channel.basic_qos(prefetch_count=1)
+
+    channel.queue_declare(queue=QUEUES['doc_in'])
+
+    channel.queue_declare(queue=QUEUES['doc_out'])
+
+    channel.queue_declare(queue=QUEUES['errors'])
+
+    # Set up the consumer
+    channel.basic_consume(queue=QUEUES['doc_in'], on_message_callback=queue_doc_in_callback, auto_ack=False)
+
+    print(' [*] Waiting for messages. To exit press CTRL+C')
+    # Start consuming messages
+    channel.start_consuming()

@@ -16,6 +16,27 @@ services:
       - ./postgres/data:/var/lib/postgresql/data
       - "./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql"
 
+  spacyner:
+    restart: $RESTART_POLICY
+    build: ./spacyner
+    environment:
+      SPACY_MODEL: $SPACY_MODEL
+      SPACY_TAG: $SPACY_TAG
+      SPACY_TIMEOUT: $SPACY_TIMEOUT
+      SPACY_ARGS: $SPACY_ARGS
+      RABBITURL: $RABBITURL
+      RMQ_SPACY: $RMQ_SPACY
+    volumes:
+      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - ./spacyner/main.py:/home/app/main.py
+    deploy:
+      replicas: 2
+      resources:
+        reservations:
+          devices:
+            - capabilities: [ gpu ]
+    # command: python __main__.py --host 0.0.0.0 --port 80 --model $SPACY_MODEL
+
   biencoder:
     restart: $RESTART_POLICY
     #image: rpozzi/blink_biencoder
@@ -33,6 +54,7 @@ services:
       RABBITURL: $RABBITURL
       RMQ_BIENCODER: $RMQ_BIENCODER
     deploy:
+      # replicas: 2 # TODO fix BUG out-of-memory (RAM, not GPU)
       resources:
         reservations:
           devices:
