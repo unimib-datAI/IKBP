@@ -121,16 +121,18 @@ def queue_doc_in_callback(ch, method, properties, body):
             'reason': 'timeout',
             'body': body
         }))
-    except Exception as exc:
-        pipeline_tb = ''.join(traceback.format_exception(exc_obj))
+    except Exception as exc_obj:
+        pipeline_tb = traceback.format_exc()
         print("DOC exception:", pipeline_tb)
-        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
         ch.basic_publish(exchange='', routing_key=QUEUES['errors'], body=json.dumps({
             'from': QUEUES['doc_in'],
             'reason': pipeline_tb,
             'body': body
         }))
+
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

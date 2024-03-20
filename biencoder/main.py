@@ -13,15 +13,7 @@ from torch.utils.data import DataLoader, SequentialSampler
 from gatenlp import Document
 import pika
 import timeout_decorator
-
-QUEUES = {
-    'doc_in': '{root}/doc/in',
-    'doc_out': '{root}/doc/out',
-    'mention_in': '{root}/mention/in',
-    'mention_out': '{root}/mention/out',
-    'entity_in': '{root}/entity/in',
-    'entity_out': '{root}/entity/out',
-}
+import traceback
 
 def vector_encode(v):
     s = base64.b64encode(v).decode()
@@ -191,8 +183,20 @@ def queue_doc_in_callback(ch, method, properties, body):
 
         ch.basic_publish(exchange='', routing_key=QUEUES['errors'], body=json.dumps({
             'from': QUEUES['doc_in'],
+            'reason': 'timeout',
             'body': body
         }))
+    except Exception as exc_obj:
+        pipeline_tb = traceback.format_exc()
+        print("DOC exception:", pipeline_tb)
+
+        ch.basic_publish(exchange='', routing_key=QUEUES['errors'], body=json.dumps({
+            'from': QUEUES['doc_in'],
+            'reason': pipeline_tb,
+            'body': body
+        }))
+
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
 
 def queue_entity_in_callback(ch, method, properties, body):
