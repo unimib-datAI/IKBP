@@ -2,6 +2,7 @@ version: "3"
 services:
 
   rabbitmq:
+    restart: $RESTART_POLICY
     image: rabbitmq:3.12-management
     ports:
       - $RABBIT_ADDR:5672
@@ -134,6 +135,8 @@ services:
     environment:
       WORKERS: $PIPELINE_WORKERS
       TIMEOUT: $PIPELINE_TIMEOUT
+      RABBITURL: $RABBITURL
     volumes:
-      - ./pipelinehelper/main.py:/home/app/main.py
+      - ./pipeline/main.py:/home/app/main.py
+      - ./pipeline/config.yml:/home/app/config.yml
 

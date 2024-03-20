@@ -10,4 +10,4 @@ elasticsearch/data
 .swp
 __pycache__
 chroma-volumes
-pipeline_config.yml
+pipeline/config.yml

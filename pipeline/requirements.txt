@@ -4,3 +4,4 @@ fastapi
 requests
 gatenlp
 pyyaml
+pika

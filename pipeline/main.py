@@ -6,6 +6,7 @@ import yaml
 import datetime
 import os
 import traceback
+import pika
 
 PIPELINEv = 'pipelineV2'
 
@@ -87,12 +88,52 @@ def load_config(config_path):
     global config
     with open(config_path, 'r') as fd:
         config = yaml.safe_load(fd)
-    assert 'pipeline' in config
-    print('Loaded pipeline:')
-    for i, pipe in enumerate(config['pipeline']):
-        print(i, pipe['name'])
+
+def get_queue_broker_callback(out):
+    def queue_doc_in_callback(ch, method, properties, body):
+        try:
+            ch.basic_publish(exchange='', routing_key=out, body=body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+
+        except Exception as exc_obj:
+            print("Broker error!")
+            pipeline_tb = ''.join(traceback.format_exception(exc_obj))
+            print(pipeline_tb)
+            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+
+    return queue_doc_in_callback
+
+
+def init_amqp():
+    # RabbitMQ connection parameters
+    global config
+    RMQ_URL = os.environ.get('RABBITURL')
+
+    # Connect to RabbitMQ server
+    parameters = pika.URLParameters(RMQ_URL)
+    connection = pika.BlockingConnection(parameters)
+    channel = connection.channel()
+
+    channel.basic_qos(prefetch_count=1)
+
+    channel.queue_declare(queue=config['http_queue'])
+
+    for rule in config['amqp_rules']:
+        channel.queue_declare(queue=rule['in'])
+        channel.queue_declare(queue=rule['out'])
+
+        channel.basic_consume(queue=rule['in'], on_message_callback=get_queue_broker_callback(rule['out']), auto_ack=False)
+
+        print('{name}: {in} --> {out}'.format(**rule))
+
+    print(' [*] Waiting for messages. To exit press CTRL+C')
+    # Start consuming messages
+    return channel
 
 
 load_config(os.environ.get('CONFIG_PATH', './config.yml'))
+
+channel = init_amqp()
+channel.start_consuming()
 
 print('Started', flush=True)
