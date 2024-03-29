@@ -119,9 +119,9 @@ services:
       - ./nilpredictor/main.py:/home/app/main.py
     environment:
       NILPREDICTOR_ARGS: $NILPREDICTOR_ARGS
-      NILPREDICTOR_TIMEOUT: $BIENCODER_TIMEOUT
+      NILPREDICTOR_TIMEOUT: $NILPREDICTOR_TIMEOUT
       RABBITURL: $RABBITURL
-      RMQ_BIENCODER: $RMQ_BIENCODER
+      RMQ_NILPREDICTOR: $RMQ_NILPREDICTOR
     # command: python main.py --host 0.0.0.0 --port 80 $NILPREDICTOR_ARGS
 
   sectionator:

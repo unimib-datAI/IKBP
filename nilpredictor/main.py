@@ -9,6 +9,7 @@ from gatenlp import Document
 import pika
 import timeout_decorator
 import traceback
+import json
 
 # input: features
 # output: NIL score
@@ -231,13 +232,14 @@ def queue_doc_in_callback(ch, method, properties, body):
 
     except timeout_decorator.TimeoutError:
         print("DOC could not complete within timeout and was terminated.")
-        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
         ch.basic_publish(exchange='', routing_key=QUEUES['errors'], body=json.dumps({
             'from': QUEUES['doc_in'],
             'reason': 'timeout',
             'body': body
         }))
+
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
     except Exception as exc_obj:
         pipeline_tb = traceback.format_exc()
         print("DOC exception:", pipeline_tb)
