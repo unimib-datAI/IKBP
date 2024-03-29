@@ -22,3 +22,6 @@ psycopg[binary]
 # annoy
 gatenlp
 requests
+pika
+timeout-decorator
+packaging

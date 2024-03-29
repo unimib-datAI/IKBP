@@ -3,7 +3,7 @@ FROM rpozzi/blink:latest AS blink
 FROM python:3.8
 
 # Upgrade PIP
-RUN python3 -m pip install --upgrade pip
+RUN python3 -m pip install pip
 
 # Install utils
 RUN apt-get update && \

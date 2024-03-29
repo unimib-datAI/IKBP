@@ -77,6 +77,9 @@ services:
       POSTGRES_PASSWORD: $POSTGRES_PASSWORD
       INDEXER_VECTOR_SIZE: $INDEXER_VECTOR_SIZE
       INDEXER_LANGUAGE: $INDEXER_LANGUAGE
+      INDEXER_TIMEOUT: $INDEXER_TIMEOUT
+      RABBITURL: $RABBITURL
+      RMQ_INDEXER: $RMQ_INDEXER
     depends_on:
       - postgres
     # command: python main.py --host 0.0.0.0 --port 80 --index $INDEXER_INDEX --postgres postgres://postgres:$POSTGRES_PASSWORD@postgres:5432/postgres --vector-size $INDEXER_VECTOR_SIZE --language $INDEXER_LANGUAGE

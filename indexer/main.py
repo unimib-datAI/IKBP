@@ -12,6 +12,10 @@ from gatenlp import Document
 from itertools import repeat
 import requests
 # from annoy import AnnoyIndex
+import pika
+import timeout_decorator
+import traceback
+import json
 
 class _Index:
     def __init__(self, n):
@@ -476,6 +480,47 @@ def load_models(args):
             assert rw_index is None, 'Error! Only one rw index is accepted.'
             rw_index = int(indexid)
 
+def queue_doc_in_callback(ch, method, properties, body):
+    print("[x] Received doc")
+    body = json.loads(body.decode())
+
+    @timeout_decorator.timeout(TIMEOUT)
+    def search_encoded_mention_from_doc(top_k, body):
+        return search_from_doc_topk(top_k, body)
+
+    default_top_k = 10
+    if body.get('features', {}).get('top_k'):
+        top_k = body.get('features', {}).get('top_k')
+    else:
+        top_k = default_top_k
+
+    try:
+        doc = search_encoded_mention_from_doc(top_k, body)
+
+        ch.basic_publish(exchange='', routing_key=QUEUES['doc_out'], body=json.dumps(doc))
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    except timeout_decorator.TimeoutError:
+        print("DOC could not complete within timeout and was terminated.")
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+
+        ch.basic_publish(exchange='', routing_key=QUEUES['errors'], body=json.dumps({
+            'from': QUEUES['doc_in'],
+            'reason': 'timeout',
+            'body': body
+        }))
+    except Exception as exc_obj:
+        pipeline_tb = traceback.format_exc()
+        print("DOC exception:", pipeline_tb)
+
+        ch.basic_publish(exchange='', routing_key=QUEUES['errors'], body=json.dumps({
+            'from': QUEUES['doc_in'],
+            'reason': pipeline_tb,
+            'body': body
+        }))
+
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # indexer
@@ -500,6 +545,16 @@ if __name__ == '__main__':
     parser.add_argument(
         "--language", type=str, default="en", help="Wikipedia language (en,it,...).",
     )
+    parser.add_argument(
+        "--rabbiturl", type=str, default='amqp://guest:guest@rabbitmq:5672/', help="rabbitmq url",
+    )
+    parser.add_argument(
+        "--queue", type=str, default="indexer", help="rabbitmq queue root",
+    )
+    parser.add_argument(
+        "--timeout", type=int, default=30, help="timeout in seconds",
+    )
+
 
     args = parser.parse_args()
 
@@ -508,9 +563,48 @@ if __name__ == '__main__':
 
     language = args.language
 
+    # RabbitMQ connection parameters
+    RMQ_URL = args.rabbiturl
+    QUEUE_ROOT = args.queue
+    TIMEOUT = args.timeout
+
+    QUEUES = {
+        'doc_in': '{root}/doc/in',
+        'doc_out': '{root}/doc/out',
+        'errors': '{root}/errors'
+    }
+    
+    for k in QUEUES:
+        QUEUES[k] = QUEUES[k].format(root=QUEUE_ROOT)
+
     print('Loading indexes...')
     load_models(args)
     print('Loading complete.')
 
-    uvicorn.run(app, host = args.host, port = args.port)
+    # Connect to RabbitMQ server
+    connection = pika.BlockingConnection(pika.URLParameters(RMQ_URL))
+    channel = connection.channel()
+
+
+    channel.basic_qos(prefetch_count=1)
+
+    channel.queue_declare(queue=QUEUES['doc_in'])
+
+    channel.queue_declare(queue=QUEUES['doc_out'])
+
+    channel.queue_declare(queue=QUEUES['errors'])
+
+    # Set up the consumer
+    channel.basic_consume(queue=QUEUES['doc_in'], on_message_callback=queue_doc_in_callback, auto_ack=False)
+
+    # # TODO MAKE uvicorn and pika run in parallel...
+    # uvicorn.run(app, host = args.host, port = args.port)
+    # print('Started uvicorn')
+
+    print(' [*] Waiting for messages. To exit press CTRL+C')
+    # Create a thread for consuming messages
+    
+    channel.start_consuming()
+    print('Started RMQ')
+
     dbconnection.close()
