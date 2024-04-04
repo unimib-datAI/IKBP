@@ -102,10 +102,7 @@ def id2props(wikipedia_id):
     else:
         return {}
 
-app = FastAPI()
-
-@app.post('/api/indexer/reset/rw')
-async def reset():
+def reset():
     # reset rw index
     index_type = indexes[rw_index]['index_type']
     del indexes[rw_index]['indexer']
@@ -135,21 +132,6 @@ async def reset():
         dbconnection.rollback()
 
         return {'res': 'ERROR'}
-
-
-@app.post('/api/indexer/search/doc')
-# remember `content-type: application/json`
-async def search_from_doc_api(doc: dict = Body(...)):
-    default_top_k = 10
-    if doc.get('features', {}).get('top_k'):
-        top_k = doc.get('features', {}).get('top_k')
-    else:
-        top_k = default_top_k
-    return search_from_doc_topk(top_k, doc)
-
-@app.post('/api/indexer/search/doc/{top_k}')
-async def search_from_doc_topk_api(top_k: int, doc: dict = Body(...)):
-    return search_from_doc_topk(top_k, doc)
 
 def search_from_doc_topk(top_k, doc):
     doc = Document.from_dict(doc)
@@ -192,8 +174,7 @@ def search_from_doc_topk(top_k, doc):
 
     return doc.to_dict()
 
-@app.post('/api/indexer/info')
-async def id2info_api(idinput: Idinput):
+def id2info_api(idinput: Idinput):
     """
     input: (id, indexer)
     ouput: (id, indexer) -> info
@@ -231,8 +212,8 @@ async def id2info_api(idinput: Idinput):
                     'props': id2props(x[3])
                 }
 
-@app.post('/api/indexer/search')
-async def search_api(input_: Input):
+
+def search_api(input_: Input):
     encodings = input_.encodings
     top_k = input_.top_k
     only_indexes = input_.only_indexes
@@ -480,6 +461,50 @@ def load_models(args):
             assert rw_index is None, 'Error! Only one rw index is accepted.'
             rw_index = int(indexid)
 
+@app.post('/api/indexer/info')
+@app.post('/api/indexer/add/doc')
+@app.post('/api/indexer/add')
+@app.post('/api/indexer/reset/rw')
+@app.post('/api/indexer/search')
+
+def create_callback_fun(myfun, myqueue, myerrorsqueue=QUEUES['errors']):
+    def callback_fun(ch, method, properties, body):
+        body = json.loads(body.decode())
+
+        @timeout_decorator.timeout(TIMEOUT)
+        def api_timeout(body):
+            return myfun(body)
+
+        try:
+            res = api_timeout(body)
+
+            ch.basic_publish(exchange='', routing_key=myqueue, body=json.dumps(res))
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+
+        except timeout_decorator.TimeoutError:
+            print("api info could not complete within timeout and was terminated.")
+
+            ch.basic_publish(exchange='', routing_key=myerrorsqueue, body=json.dumps({
+                'from': myqueue,
+                'reason': 'timeout',
+                'body': body
+            }))
+
+            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+        except Exception as exc_obj:
+            pipeline_tb = traceback.format_exc()
+            print("DOC exception:", pipeline_tb)
+
+            ch.basic_publish(exchange='', routing_key=myerrorsqueue, body=json.dumps({
+                'from': myqueue,
+                'reason': pipeline_tb,
+                'body': body
+            }))
+
+            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+
+        return callback_fun
+
 def queue_doc_in_callback(ch, method, properties, body):
     print("[x] Received doc")
     body = json.loads(body.decode())
@@ -572,6 +597,7 @@ if __name__ == '__main__':
     QUEUES = {
         'doc_in': '{root}/doc/in',
         'doc_out': '{root}/doc/out',
+        'info': '{root}/info',
         'errors': '{root}/errors'
     }
     
@@ -590,13 +616,20 @@ if __name__ == '__main__':
     channel.basic_qos(prefetch_count=1)
 
     channel.queue_declare(queue=QUEUES['doc_in'])
-
     channel.queue_declare(queue=QUEUES['doc_out'])
+
+    channel.queue_declare(queue=QUEUES['info'])
+    channel.queue_declare(queue=QUEUES['reset'])
+    channel.queue_declare(queue=QUEUES['search'])
 
     channel.queue_declare(queue=QUEUES['errors'])
 
     # Set up the consumer
     channel.basic_consume(queue=QUEUES['doc_in'], on_message_callback=queue_doc_in_callback, auto_ack=False)
+    channel.basic_consume(queue=QUEUES['doc_in'], on_message_callback=create_callback_fun(id2info_api, QUEUES['info']), auto_ack=False)
+    channel.basic_consume(queue=QUEUES['doc_in'], on_message_callback=create_callback_fun(reset, QUEUES['reset']), auto_ack=False)
+    channel.basic_consume(queue=QUEUES['doc_in'], on_message_callback=create_callback_fun(id2info_api, QUEUES['info']), auto_ack=False)
+    channel.basic_consume(queue=QUEUES['doc_in'], on_message_callback=create_callback_fun(id2info_api, QUEUES['info']), auto_ack=False)
 
     # # TODO MAKE uvicorn and pika run in parallel...
     # uvicorn.run(app, host = args.host, port = args.port)
