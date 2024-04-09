@@ -4,6 +4,14 @@ amqp_rules:
   - name: ner-nel
     in: ner_out
     out: nel_in
-  - name: nel-nilp
+  - name: nel-nilp-with-backup
     in: nel_out
-    out: nilp_in
+    out:
+      - nilp_in
+      - nel_out_backup
+  - name: nel-nilp
+    in:
+      - in1
+      - in2
+    out: outqueue
+    

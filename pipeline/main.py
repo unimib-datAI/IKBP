@@ -89,10 +89,13 @@ def load_config(config_path):
     with open(config_path, 'r') as fd:
         config = yaml.safe_load(fd)
 
-def get_queue_broker_callback(out):
+def get_queue_broker_callback(outlist):
+    if not isinstance(outlist, list):
+        outlist = [outlist]
     def queue_doc_in_callback(ch, method, properties, body):
         try:
-            ch.basic_publish(exchange='', routing_key=out, body=body)
+            for out in outlist:
+                ch.basic_publish(exchange='', routing_key=out, body=body)
             ch.basic_ack(delivery_tag=method.delivery_tag)
 
         except Exception as exc_obj:
@@ -119,10 +122,20 @@ def init_amqp():
     channel.queue_declare(queue=config['http_queue'])
 
     for rule in config['amqp_rules']:
-        channel.queue_declare(queue=rule['in'])
-        channel.queue_declare(queue=rule['out'])
+        rules_in = rule['in']
+        if not isinstance(rules_in, list):
+            rules_in = [rules_in]
+        rules_out = rule['out']
+        if not isinstance(rules_out, list):
+            rules_out = [rules_out]
 
-        channel.basic_consume(queue=rule['in'], on_message_callback=get_queue_broker_callback(rule['out']), auto_ack=False)
+        for rin in rules_in:
+            channel.queue_declare(queue=rin)
+        for rout in rules_out:
+            channel.queue_declare(queue=rout)
+
+        for rin in rules_in:
+            channel.basic_consume(queue=rin, on_message_callback=get_queue_broker_callback(rules_out), auto_ack=False)
 
         print('{name}: {in} --> {out}'.format(**rule))
 
