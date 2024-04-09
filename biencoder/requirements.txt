@@ -31,4 +31,3 @@ pandas
 gatenlp
 pika
 pydantic==1.10.9
-timeout-decorator

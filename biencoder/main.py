@@ -12,7 +12,7 @@ import logging
 from torch.utils.data import DataLoader, SequentialSampler
 from gatenlp import Document
 import pika
-import timeout_decorator
+import watchdog
 import traceback
 
 def vector_encode(v):
@@ -166,27 +166,26 @@ def queue_doc_in_callback(ch, method, properties, body):
     print("[x] Received doc")
     body = json.loads(body.decode())
 
-    @timeout_decorator.timeout(TIMEOUT)
+    # watchdog
+    wtd = watchdog.WatchdogThread(
+        timeout = TIMEOUT,
+        memory = MAX_MEM,
+        gpu = MAX_GPU,
+    )
+
+    wtd.set_handler()
+
     def timeout_encode_mention_from_doc(body):
         return encode_mention_from_doc(body)
 
     try:
         #doc = func_timeout(TIMEOUT, encode_mention_from_doc, args=(body))
+        wtd.start()
         doc = timeout_encode_mention_from_doc(body)
 
         ch.basic_publish(exchange='', routing_key=QUEUES['doc_out'], body=json.dumps(doc))
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    except timeout_decorator.TimeoutError:
-        print("DOC could not complete within timeout and was terminated.")
-
-        ch.basic_publish(exchange='', routing_key=QUEUES['errors'], body=json.dumps({
-            'from': QUEUES['doc_in'],
-            'reason': 'timeout',
-            'body': body
-        }))
-
-        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
     except Exception as exc_obj:
         pipeline_tb = traceback.format_exc()
         print("DOC exception:", pipeline_tb)
@@ -240,6 +239,12 @@ if __name__ == '__main__':
     parser.add_argument(
         "--timeout", type=int, default=30, help="timeout in seconds",
     )
+    parser.add_argument(
+        "--max_memory", type=int, default=1000000, help="max memory in bytes",
+    )
+    parser.add_argument(
+        "--max_gpu", type=int, default=1000000, help="max gpu in bytes",
+    )
 
     args = parser.parse_args()
 
@@ -254,6 +259,8 @@ if __name__ == '__main__':
     RMQ_URL = args.rabbiturl
     QUEUE_ROOT = args.queue
     TIMEOUT = args.timeout
+    MAX_MEM = args.max_memory
+    MAX_GPU = args.max_gpu
 
     QUEUES = {
         'doc_in': '{root}/doc/in',
@@ -269,7 +276,10 @@ if __name__ == '__main__':
         QUEUES[k] = QUEUES[k].format(root=QUEUE_ROOT)
 
     # Connect to RabbitMQ server
-    connection = pika.BlockingConnection(pika.URLParameters(RMQ_URL))
+    parameters = pika.URLParameters(RMQ_URL)
+    parameters.heartbeat = TIMEOUT + 1
+    parameters.blocked_connection_timeout = TIMEOUT + 1
+    connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
 
 
