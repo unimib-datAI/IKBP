@@ -7,6 +7,8 @@ services:
     ports:
       - $RABBIT_ADDR:5672
       - $RABBIT_MANAGEMENT_ADDR:15672
+    volumes:
+      - ./rabbitmq/data:/var/lib/rabbitmq
 
   postgres:
     restart: $RESTART_POLICY
@@ -24,6 +26,7 @@ services:
       SPACY_MODEL: $SPACY_MODEL
       SPACY_TAG: $SPACY_TAG
       SPACY_TIMEOUT: $SPACY_TIMEOUT
+      SPACY_MEMORY: $SPACY_MEMORY
       SPACY_ARGS: $SPACY_ARGS
       RABBITURL: $RABBITURL
       RMQ_SPACY: $RMQ_SPACY
@@ -47,6 +50,7 @@ services:
     volumes:
       - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
       - ./biencoder/main.py:/home/app/main.py
+      - ./biencoder/watchdog.py:/home/app/watchdog.py
     environment:
       PYTHONPATH: /home/app
       BIENCODER_MODEL: $BIENCODER_MODEL
@@ -127,6 +131,11 @@ services:
     volumes:
       - ./consolidation/main.py:/home/app/main.py
       - ./consolidation/utils.py:/home/app/utils.py
+    environment:
+      RABBITURL: $RABBITURL
+      RMQ_CONSOLIDATION: $RMQ_CONSOLIDATION
+      CONSOLIDATION_TIMEOUT: $CONSOLIDATION_TIMEOUT
+      CONSOLIDATION_MAX_MEMORY: $CONSOLIDATION_MAX_MEMORY
     # command: sleep 7200
     # command: python main.py --host 0.0.0.0 --port 80
 
@@ -167,4 +176,20 @@ services:
     volumes:
       - ./pipeline/main.py:/home/app/main.py
       - ./pipeline/config.yml:/home/app/config.yml
+
+  fixurl:
+    restart: $RESTART_POLICY
+    build:
+        context: ./fixurl
+        dockerfile: Dockerfile
+    environment:
+      RABBITURL: $RABBITURL
+
+  corpora:
+    restart: $RESTART_POLICY
+    build:
+        context: ./corpora
+        dockerfile: Dockerfile
+    environment:
+      RABBITURL: $RABBITURL
 

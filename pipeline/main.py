@@ -119,7 +119,7 @@ def init_amqp():
 
     channel.basic_qos(prefetch_count=1)
 
-    channel.queue_declare(queue=config['http_queue'])
+    channel.queue_declare(queue=config['http_queue'], durable=True)
 
     for rule in config['amqp_rules']:
         rules_in = rule['in']
@@ -130,9 +130,9 @@ def init_amqp():
             rules_out = [rules_out]
 
         for rin in rules_in:
-            channel.queue_declare(queue=rin)
+            channel.queue_declare(queue=rin, durable=True)
         for rout in rules_out:
-            channel.queue_declare(queue=rout)
+            channel.queue_declare(queue=rout, durable=True)
 
         for rin in rules_in:
             channel.basic_consume(queue=rin, on_message_callback=get_queue_broker_callback(rules_out), auto_ack=False)

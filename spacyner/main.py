@@ -5,9 +5,9 @@ from spacy.cli import download as spacy_download
 import os
 from gatenlp import Document
 import pika
-import timeout_decorator
 import json
 import traceback
+from decorator_limit import check_limits
 
 DEFAULT_TAG='aplha_v0.1.0_spacy'
 model = ''
@@ -101,7 +101,7 @@ def queue_doc_in_callback(ch, method, properties, body):
     print("[x] Received doc")
     body = json.loads(body.decode())
 
-    @timeout_decorator.timeout(TIMEOUT)
+    @check_limits(timeout=TIMEOUT, memory=MAX_MEMORY, gpu=MAX_GPU)
     def timeout_encode_mention(body):
         return encode_mention(body)
 
@@ -112,16 +112,6 @@ def queue_doc_in_callback(ch, method, properties, body):
         ch.basic_publish(exchange='', routing_key=QUEUES['doc_out'], body=json.dumps(doc))
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    except timeout_decorator.TimeoutError:
-        print("DOC could not complete within timeout and was terminated.")
-
-        ch.basic_publish(exchange='', routing_key=QUEUES['errors'], body=json.dumps({
-            'from': QUEUES['doc_in'],
-            'reason': 'timeout',
-            'body': body
-        }))
-
-        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
     except Exception as exc_obj:
         pipeline_tb = traceback.format_exc()
         print("DOC exception:", pipeline_tb)
@@ -158,6 +148,12 @@ if __name__ == '__main__':
     parser.add_argument(
         "--timeout", type=int, default=30, help="timeout in seconds",
     )
+    parser.add_argument(
+        "--max_memory", type=int, default=100000000, help="max memory in bytes",
+    )
+    parser.add_argument(
+        "--max_gpu", type=int, default=100000000, help="max gpu memory in bytes",
+    )
 
     args = parser.parse_args()
 
@@ -166,6 +162,8 @@ if __name__ == '__main__':
     tag = args.tag
     gpu_id = args.gpu_id
     TIMEOUT = args.timeout
+    MAX_MEMORY = args.max_memory
+    MAX_GPU = args.max_gpu
 
     initialize()
 
@@ -179,7 +177,7 @@ if __name__ == '__main__':
         'doc_out': '{root}/doc/out',
         'errors': '{root}/errors'
     }
-    
+
     for k in QUEUES:
         QUEUES[k] = QUEUES[k].format(root=QUEUE_ROOT)
 
@@ -193,11 +191,9 @@ if __name__ == '__main__':
 
     channel.basic_qos(prefetch_count=1)
 
-    channel.queue_declare(queue=QUEUES['doc_in'])
-
-    channel.queue_declare(queue=QUEUES['doc_out'])
-
-    channel.queue_declare(queue=QUEUES['errors'])
+    for k in QUEUES:
+        QUEUES[k] = QUEUES[k].format(root=QUEUE_ROOT)
+        channel.queue_declare(queue=QUEUES[k], durable=True)
 
     # Set up the consumer
     channel.basic_consume(queue=QUEUES['doc_in'], on_message_callback=queue_doc_in_callback, auto_ack=False)

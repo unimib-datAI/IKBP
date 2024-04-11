@@ -60,7 +60,7 @@ class HttpIndexer:
         body = dict(body)
         res = requests.post(self.url + '/api/indexer/info', json=body)
         return res.json()
-        
+
 
 def vector_encode(v):
     s = base64.b64encode(v).decode()
@@ -334,7 +334,7 @@ def search(encodings, top_k, only_indexes=None):
                             'score': float(_score),
                             'norm_score': float(_norm_score)
                         })
-        
+
                 n += 1
         else:
             # indexer http
@@ -574,7 +574,7 @@ if __name__ == '__main__':
         'doc_out': '{root}/doc/out',
         'errors': '{root}/errors'
     }
-    
+
     for k in QUEUES:
         QUEUES[k] = QUEUES[k].format(root=QUEUE_ROOT)
 
@@ -589,11 +589,9 @@ if __name__ == '__main__':
 
     channel.basic_qos(prefetch_count=1)
 
-    channel.queue_declare(queue=QUEUES['doc_in'])
-
-    channel.queue_declare(queue=QUEUES['doc_out'])
-
-    channel.queue_declare(queue=QUEUES['errors'])
+    for k in QUEUES:
+        QUEUES[k] = QUEUES[k].format(root=QUEUE_ROOT)
+        channel.queue_declare(queue=QUEUES[k], durable=True)
 
     # Set up the consumer
     channel.basic_consume(queue=QUEUES['doc_in'], on_message_callback=queue_doc_in_callback, auto_ack=False)
@@ -604,7 +602,7 @@ if __name__ == '__main__':
 
     print(' [*] Waiting for messages. To exit press CTRL+C')
     # Create a thread for consuming messages
-    
+
     channel.start_consuming()
     print('Started RMQ')
 

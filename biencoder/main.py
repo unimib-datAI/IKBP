@@ -271,7 +271,7 @@ if __name__ == '__main__':
         'entity_out': '{root}/entity/out',
         'errors': '{root}/errors'
     }
-    
+
     for k in QUEUES:
         QUEUES[k] = QUEUES[k].format(root=QUEUE_ROOT)
 
@@ -285,15 +285,9 @@ if __name__ == '__main__':
 
     channel.basic_qos(prefetch_count=1)
 
-    channel.queue_declare(queue=QUEUES['doc_in'])
-    channel.queue_declare(queue=QUEUES['mention_in'])
-    channel.queue_declare(queue=QUEUES['entity_in'])
-
-    channel.queue_declare(queue=QUEUES['doc_out'])
-    channel.queue_declare(queue=QUEUES['mention_out'])
-    channel.queue_declare(queue=QUEUES['entity_out'])
-
-    channel.queue_declare(queue=QUEUES['errors'])
+    for k in QUEUES:
+        QUEUES[k] = QUEUES[k].format(root=QUEUE_ROOT)
+        channel.queue_declare(queue=QUEUES[k], durable=True)
 
     # Set up the consumer
     channel.basic_consume(queue=QUEUES['doc_in'], on_message_callback=queue_doc_in_callback, auto_ack=False)

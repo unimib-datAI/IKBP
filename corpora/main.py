@@ -1,33 +1,31 @@
 import argparse
-import re
 from gatenlp import Document
-from utils import make_clusters
-import pickle
 import json
 import pika
-import watchdog
 import traceback
+import copy
 
 def queue_doc_in_callback(ch, method, properties, body):
     print("[x] Received doc")
-    body = json.loads(body.decode())
-
-    # watchdog
-    # TODO better to not start the watchdog thread at every message.
-    # the thread should stay alive
-    wtd = watchdog.WatchdogThread(
-        timeout = TIMEOUT,
-        memory = MAX_MEM,
-        gpu = 100, # dummy
-    )
-
-    wtd.set_handler()
+    doc = json.loads(body.decode())
 
     try:
-        #doc = func_timeout(TIMEOUT, encode_mention_from_doc, args=(body))
-        wtd.start()
-        doc = make_clusters(body, model)
-        doc = doc.to_dict()
+        del doc['annotation_sets']['entities_merged_corpora']
+        doc['annotation_sets']['entities_merged_raw'] = copy.deepcopy(doc['annotation_sets']['entities_merged'])
+        doc['annotation_sets']['entities_merged_raw']['name'] = 'entities_merged_raw'
+        del doc['annotation_sets']['entities_merged']
+
+        gdoc = Document.from_dict(doc)
+
+        corpora = gdoc.annset('corpora')
+        entities_corpora = gdoc.annset('entities_merged') # we put here only the corpora of messages
+        for ann in gdoc.annset('entities_merged_raw'):
+            #if corpora.overlapping(ann):
+            if corpora.covering(ann):
+                # keep ann
+                entities_corpora.add_ann(ann)
+
+        doc = gdoc.to_dict()
 
         ch.basic_publish(exchange='', routing_key=QUEUES['doc_out'], body=json.dumps(doc))
         ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -48,32 +46,18 @@ def queue_doc_in_callback(ch, method, properties, body):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--model", type=str, default="/home/app/models/clustering/xgb_clustering.sav", help="model path",
-    )
-    parser.add_argument(
         "--rabbiturl", type=str, default='amqp://guest:guest@rabbitmq:5672/', help="rabbitmq url",
     )
     parser.add_argument(
-        "--queue", type=str, default="clustering", help="rabbitmq queue root",
-    )
-    parser.add_argument(
-        "--timeout", type=int, default=30, help="timeout in seconds",
-    )
-    parser.add_argument(
-        "--max_memory", type=int, default=1000000, help="max memory in bytes",
+        "--queue", type=str, default="corpora", help="rabbitmq queue root",
     )
 
     args = parser.parse_args()
 
-    print('Loading model...')
-    model = pickle.load(open(args.model, 'rb'))
-    print('Model loaded.')
-
     # RabbitMQ connection parameters
     RMQ_URL = args.rabbiturl
     QUEUE_ROOT = args.queue
-    TIMEOUT = args.timeout
-    MAX_MEM = args.max_memory
+    TIMEOUT = 900
 
     QUEUES = {
         'doc_in': '{root}/doc/in',

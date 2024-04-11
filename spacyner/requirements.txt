@@ -3,4 +3,3 @@ spacy-transformers
 thinc[cuda113,torch]
 gatenlp
 pika
-timeout-decorator

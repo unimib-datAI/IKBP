@@ -13,8 +13,6 @@ except ImportError:
     print('Cannot import torch. Skipping GPU watchdog.')
     SKIP_GPU = True
 
-GLOBAL_EXCEPTION = None
-
 class TimeoutException(Exception):
     pass
 
@@ -39,14 +37,14 @@ class WatchdogThread(threading.Thread):
         self.stop = stop
 
         self.stop_flag = False
+        self.exception = None
 
     def set_handler(self):
         def handler(signum, frame):
-            global GLOBAL_EXCEPTION
-            if GLOBAL_EXCEPTION is None:
+            if self.exception is None:
                 raise WatchdogThreadException("Resource limit reached. BUT no more information.")
             else:
-                raise GLOBAL_EXCEPTION
+                raise self.exception
         signal.signal(signal.SIGALRM, handler)
 
     def reset_time(self):
@@ -64,23 +62,22 @@ class WatchdogThread(threading.Thread):
         return torch.cuda.memory_allocated()
 
     def check(self):
-        global GLOBAL_EXCEPTION
 
         time = self.get_time()
         mem = self.get_memory()
         gpu = self.get_gpu()
 
         if time > self.time_limit:
-            GLOBAL_EXCEPTION = TimeoutException("Function execution time exceeded: {} > {}".format(time, self.time_limit))
+            self.exception = TimeoutException("Function execution time exceeded: {} > {}".format(time, self.time_limit))
             print('raising timeout')
         if mem > self.memory:
-            GLOBAL_EXCEPTION = MemoryLimitExceededException("Memory usage exceeded: {} > {}".format(mem, self.memory))
+            self.exception = MemoryLimitExceededException("Memory usage exceeded: {} > {}".format(mem, self.memory))
             print('rasing mem')
         if gpu > self.gpu:
-            GLOBAL_EXCEPTION = GPUMemoryLimitExceededException("GPU Memory usage exceeded: {} > {}".format(gpu, self.gpu))
+            self.exception = GPUMemoryLimitExceededException("GPU Memory usage exceeded: {} > {}".format(gpu, self.gpu))
             print('raising gpu')
 
-        if GLOBAL_EXCEPTION is not None:
+        if self.exception is not None:
             if self.stop:
                 self.stop_flag = True
             signal.alarm(self.alarm_time)

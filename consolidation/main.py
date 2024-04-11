@@ -1,9 +1,6 @@
 import argparse
-import re
-from gatenlp import Document
-from utils import make_clusters
-import pickle
-import json
+from utils import consolidation
+import json # debug
 import pika
 import watchdog
 import traceback
@@ -26,8 +23,7 @@ def queue_doc_in_callback(ch, method, properties, body):
     try:
         #doc = func_timeout(TIMEOUT, encode_mention_from_doc, args=(body))
         wtd.start()
-        doc = make_clusters(body, model)
-        doc = doc.to_dict()
+        doc = consolidation(body)
 
         ch.basic_publish(exchange='', routing_key=QUEUES['doc_out'], body=json.dumps(doc))
         ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -44,17 +40,13 @@ def queue_doc_in_callback(ch, method, properties, body):
 
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--model", type=str, default="/home/app/models/clustering/xgb_clustering.sav", help="model path",
-    )
     parser.add_argument(
         "--rabbiturl", type=str, default='amqp://guest:guest@rabbitmq:5672/', help="rabbitmq url",
     )
     parser.add_argument(
-        "--queue", type=str, default="clustering", help="rabbitmq queue root",
+        "--queue", type=str, default="consolidation", help="rabbitmq queue root",
     )
     parser.add_argument(
         "--timeout", type=int, default=30, help="timeout in seconds",
@@ -65,11 +57,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    print('Loading model...')
-    model = pickle.load(open(args.model, 'rb'))
-    print('Model loaded.')
-
-    # RabbitMQ connection parameters
+   # RabbitMQ connection parameters
     RMQ_URL = args.rabbiturl
     QUEUE_ROOT = args.queue
     TIMEOUT = args.timeout
