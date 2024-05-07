@@ -348,7 +348,12 @@ async def query_elastic_index(
     query = {
         "bool": {
             "must": [
-                {"match": {"text": req.text}},
+                {
+                    "query_string": {
+                        "query": req.text,
+                        "default_field": "text"
+                    }
+                }
             ]
         }
     }

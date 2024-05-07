@@ -22,10 +22,10 @@ chroma_indexer.create_index(INDEX_COLLECTION_NAME)
 elastic_indexer.create_index(INDEX_COLLECTION_NAME)
 
 print("Start indexing")
-domains = ["famiglia", "strada", "bancario"]
+domains = ["famiglia"]#, "strada", "bancario"]
 # index 100 documents for each domain
 for domain in domains:
-    documents = requests.get(DOCS_BASE_URL + "/api/mongo/document?limit=20&q=" + domain)
+    documents = requests.get(DOCS_BASE_URL + "/api/mongo/document?limit=1000")
     documents = documents.json()["docs"]
 
     print("Indexing documents for domain: " + domain)
@@ -33,7 +33,7 @@ for domain in domains:
         doc_id = doc["id"]
         # retrieve a full document
         current_doc = retriever.retrieve(doc_id)
-        # # index chunks for the document
+        # index chunks for the document
         chroma_indexer.index(
             collection="test",
             doc=current_doc,
