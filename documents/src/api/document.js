@@ -104,6 +104,9 @@ export default (app) => {
       // add mention to annotations features
       if (annset.name.startsWith('entities')) {
         for (const annot of annset.annotations) {
+          if (!('features' in annot)) {
+            annot.features = {};
+          }
           if (!('mention' in annot.features)) {
             annot.features.mention = document.text.substring(annot.start, annot.end);
           }
