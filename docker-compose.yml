@@ -19,6 +19,7 @@ services:
       MONGO_INITDB_DATABASE: main
       MONGO_INITDB_USERNAME: usr
       MONGO_INITDB_PASSWORD: $MONGO_PASSWORD
+      MONGO: $MONGO
     volumes:
       - ./mongo/data:/data/db
       - ./mongo/initdb.d:/docker-entrypoint-initdb.d/
@@ -29,7 +30,7 @@ services:
     environment:
       PORT: 3001
       ENABLE_AUTH: false
-      MONGO: mongodb://usr:$MONGO_PASSWORD@mongo:27017/main
+      MONGO: $MONGO
     volumes:
       - ./documents/src:/app/src
 
