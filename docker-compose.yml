@@ -147,6 +147,7 @@ services:
         NEXT_PUBLIC_FULL_PATH: $UI_NEXT_PUBLIC_FULL_PATH
         API_LLM: $UI_API_LLM
         API_INDEXER: $UI_API_INDEXER
+        VARIANT: $UI_VARIANT
     ports:
       - $LISTEN_UI:3000
     environment:
@@ -161,6 +162,7 @@ services:
       NEXT_PUBLIC_FULL_PATH: $UI_NEXT_PUBLIC_FULL_PATH
       API_LLM: $UI_API_LLM
       API_INDEXER: $UI_API_INDEXER
+      VARIANT: $UI_VARIANT
 
     volumes:
       - ./giustizia-ui/modules:/app/modules
