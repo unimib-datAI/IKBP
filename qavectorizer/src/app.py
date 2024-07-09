@@ -4,9 +4,6 @@ from pydantic import BaseModel
 from typing import List
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, Depends
-import chromadb
-from chromadb import errors
-from chromadb.config import Settings
 import uuid
 from sentence_transformers import SentenceTransformer
 from functools import lru_cache
@@ -46,92 +43,16 @@ app.add_middleware(
 )
 
 
-@app.get("/chroma/collection/{collection_name}")
-def get_collection(collection_name):
-    try:
-        return chroma_client.get_collection(name=collection_name)
-    except Exception:
-        raise HTTPException(status_code=404049, detail="Collection not found")
-
 
 class CreateCollectionRequest(BaseModel):
     name: str
 
-
-@app.post("/chroma/collection")
-def create_collection(req: CreateCollectionRequest):
-    # try:
-    collection = chroma_client.get_or_create_collection(name=req.name)
-    count = collection.count()
-
-    return {**collection.dict(), "n_documents": count}
-    # except Exception:
-    #     raise HTTPException(status_code=409, detail="Collection already exists")
-
-
-@app.get("/chroma/collection/{collection_name}/count")
-def count_collection_docs(collection_name):
-    try:
-        collection = chroma_client.get_collection(collection_name)
-        count = collection.count()
-
-        return {"total_docs": count}
-
-    except Exception:
-        raise HTTPException(
-            status_code=500, detail="Something went wrong when counting documents"
-        )
-
-
-@app.delete("/chroma/collection/{collection_name}")
-def delete_collection(collection_name):
-    try:
-        chroma_client.delete_collection(name=collection_name)
-        return {"count": 1}
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail="Collection not found")
 
 
 class IndexDocumentRequest(BaseModel):
     embeddings: List[List[float]]
     documents: List[str]
     metadatas: List[dict] = []
-
-
-@app.post("/chroma/collection/{collection_name}/doc")
-def index_chroma_document(req: IndexDocumentRequest, collection_name):
-    try:
-        collection = chroma_client.get_collection(collection_name)
-        chunks_ids = [str(uuid.uuid4()) for _ in req.embeddings]
-
-        collection.add(
-            documents=req.documents,
-            embeddings=req.embeddings,
-            metadatas=req.metadatas,
-            ids=chunks_ids,
-        )
-
-        return {"added": len(req.embeddings)}
-    except errors.IDAlreadyExistsError:
-        raise HTTPException(
-            status_code=409, detail="A document with the same id already exists"
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=req.embeddings)
-
-
-@app.delete("/chroma/collection/{collection_name}/doc/{document_id}")
-def delete_document(collection_name, document_id):
-    try:
-        # delete indexed embeddings for the document
-        collection = chroma_client.get_collection(collection_name)
-        collection.delete(where={"doc_id": document_id})
-        return {"count": 1}
-
-    except Exception:
-        raise HTTPException(
-            status_code=500, detail="Something went wrong when deleting the document"
-        )
 
 
 class QueryCollectionRquest(BaseModel):
@@ -158,9 +79,7 @@ class CustomJSONResponse(JSONResponse):
     "/chroma/collection/{collection_name}/query", response_class=CustomJSONResponse
 )
 async def query_collection(collection_name: str, req: QueryCollectionRquest):
-    # try:
-    # get most similar chunks
-    # collection = chroma_client.get_collection(collection_name)
+
     embeddings = []
 
     with torch.no_grad():
@@ -287,24 +206,7 @@ def index_elastic_document_raw(doc, index_name):
 @app.post("/elastic/index/{index_name}/doc")
 def index_elastic_document(req: IndexElasticDocumentRequest, index_name):
     return index_elastic_document_raw(req.doc, index_name)
-    # try:
-    #     collection = chroma_client.get_collection(collection_name)
-    #     chunks_ids = [str(uuid.uuid4()) for _ in req.embeddings]
 
-    #     collection.add(
-    #         documents=req.documents,
-    #         embeddings=req.embeddings,
-    #         metadatas=req.metadatas,
-    #         ids=chunks_ids,
-    #     )
-
-    #     return {"added": len(req.embeddings)}
-    # except errors.IDAlreadyExistsError:
-    #     raise HTTPException(
-    #         status_code=409, detail="A document with the same id already exists"
-    #     )
-    # except Exception as e:
-    #     raise HTTPException(status_code=500, detail=req.embeddings)
 
 
 def ogg2name(ogg):
@@ -523,13 +425,7 @@ if __name__ == "__main__":
     model = model.to(environ.get("SENTENCE_TRANSFORMER_DEVICE", "cuda"))
     print("model on device", model.device)
     model = model.eval()
-    # chroma_client = chromadb.Client(
-    #     Settings(
-    #         chroma_server_host=settings.host_base_url,
-    #         chroma_server_http_port=settings.chroma_port,
-    #     )
-    # )
-    # collections = chroma_client.get_collections()
+
 
     # Print each collection
     # for collection in collections:

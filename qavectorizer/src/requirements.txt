@@ -1,7 +1,6 @@
-fastapi==0.85.1
-langchain
+fastapi
 uvicorn
 sentence-transformers
 tqdm
-chromadb
 elasticsearch
+pydantic-settings
