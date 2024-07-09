@@ -8,7 +8,7 @@ import asyncio
 
 
 class CerberoModel:
-    def __init__(self):
+    def __init__(self, n_gpu_layers=-1):
 
         self.llm = Llama(
             model_path=hf_hub_download(
@@ -16,7 +16,7 @@ class CerberoModel:
                 filename="ggml-model-Q8_0.gguf",
             ),
             n_ctx=8192,
-            n_gpu_layers=-1,
+            n_gpu_layers=n_gpu_layers,
         )
 
     def tokenize(self, inputs: str):
