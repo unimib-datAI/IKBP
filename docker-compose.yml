@@ -30,7 +30,7 @@ services:
     restart: $RESTART_POLICY
     build: documents
     environment:
-      PORT: 3001
+      DOCS_PORT: 3001
       ENABLE_AUTH: false
       MONGO: $MONGO
     volumes:
