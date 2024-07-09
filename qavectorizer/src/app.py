@@ -179,7 +179,7 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
             "k": 5,  # Number of nearest neighbors to return (adjust as needed)
         },
     }
-    results = es_client.search(index=collection_name body=query_body)
+    results = es_client.search(index=collection_name, body=query_body)
 
     del embeddings
 
