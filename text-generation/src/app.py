@@ -14,9 +14,10 @@ from typing import Any, Dict, Optional, List
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, Request
-from EXLlamaModel import EXLlamaModel
-from exllama.generator import ExLlamaGenerator
 
+# from EXLlamaModel import EXLlamaModel
+# from exllama.generator import ExLlamaGenerator
+from cerberoModel import CerberoModel
 
 # exllama imports:
 
@@ -53,22 +54,22 @@ parser.add_argument(
 args = parser.parse_args()
 
 # Directory check:
-if args.directory is not None:
-    args.tokenizer = os.path.join(args.directory, "tokenizer.model")
-    args.config = os.path.join(args.directory, "config.json")
-    st_pattern = os.path.join(args.directory, "*.safetensors")
-    st = glob.glob(st_pattern)
-    if len(st) == 0:
-        print(f" !! No files matching {st_pattern}")
-        sys.exit()
-    if len(st) > 1:
-        print(f" !! Multiple files matching {st_pattern}")
-        sys.exit()
-    args.model = st[0]
-else:
-    if args.tokenizer is None or args.config is None or args.model is None:
-        print(" !! Please specify -d")
-        sys.exit()
+# if args.directory is not None:
+#     args.tokenizer = os.path.join(args.directory, "tokenizer.model")
+#     args.config = os.path.join(args.directory, "config.json")
+#     st_pattern = os.path.join(args.directory, "*.safetensors")
+#     st = glob.glob(st_pattern)
+#     if len(st) == 0:
+#         print(f" !! No files matching {st_pattern}")
+#         sys.exit()
+#     if len(st) > 1:
+#         print(f" !! Multiple files matching {st_pattern}")
+#         sys.exit()
+#     args.model = st[0]
+# else:
+#     if args.tokenizer is None or args.config is None or args.model is None:
+#         print(" !! Please specify -d")
+#         sys.exit()
 # -------
 
 
@@ -132,24 +133,51 @@ async def stream_data(req: GenerateRequest):
             await asyncio.sleep(1)
 
     try:
-        # Set these from GenerateRequest:
-        model.generator.settings = ExLlamaGenerator.Settings()
-        model.generator.settings.temperature = req.temperature
-        model.generator.settings.top_k = req.top_k
-        model.generator.settings.top_p = req.top_p
-        model.generator.settings.min_p = req.min_p
-        model.generator.settings.token_repetition_penalty_max = (
-            req.token_repetition_penalty_max
+        print("generate", req.max_new_tokens)
+        _MESSAGE, max_new_tokens = model.prepare_message(
+            messages=req.messages,
+            max_new_tokens=req.max_new_tokens,
         )
-        model.generator.settings.token_repetition_penalty_sustain = (
-            req.token_repetition_penalty_sustain
-        )
-        decay = int(
-            req.token_repetition_penalty_decay
-            if req.token_repetition_penalty_decay
-            else req.token_repetition_penalty_sustain / 2
-        )
-        model.generator.settings.token_repetition_penalty_decay = decay
+
+        if req.stream:
+            # copy of generate_simple() so that I could yield each token for streaming without having to change generator.py and make merging updates a nightmare:
+            print("temp", req.temperature)
+            return StreamingResponse(
+                model.generate_stream(
+                    _MESSAGE,
+                    max_new_tokens,
+                    req.temperature,
+                    req.top_k,
+                    req.top_p,
+                    req.min_p,
+                    req.token_repetition_penalty_max,
+                    req.token_repetition_penalty_sustain,
+                    req.token_repetition_penalty_decay,
+                ),
+                media_type="text/event-stream",
+            )
+        else:
+            return model.generate(_MESSAGE, max_new_tokens)
+    except Exception as e:
+        print("Exception", e)
+        return {"response": f"Exception while processing request: {e}"}
+
+    finally:
+        semaphore.release()
+
+
+@app.post("/generate-test")
+async def stream_data_test(req: GenerateRequest):
+    while True:
+        try:
+            # Attempt to acquire the semaphore without waiting, in a loop...
+            await asyncio.wait_for(semaphore.acquire(), timeout=0.1)
+            break
+        except asyncio.TimeoutError:
+            print("Server is busy")
+            await asyncio.sleep(1)
+
+    try:
 
         _MESSAGE, max_new_tokens = model.prepare_message(
             messages=req.messages,
@@ -158,12 +186,24 @@ async def stream_data(req: GenerateRequest):
 
         if req.stream:
             # copy of generate_simple() so that I could yield each token for streaming without having to change generator.py and make merging updates a nightmare:
-            print('stream')
-            return StreamingResponse(model.generate_stream(_MESSAGE, max_new_tokens))
+            print("temp", req.temperature)
+            return StreamingResponse(
+                model.generate_stream(
+                    _MESSAGE,
+                    max_new_tokens,
+                    req.temperature,
+                    req.top_k,
+                    req.top_p,
+                    req.min_p,
+                    req.token_repetition_penalty_max,
+                    req.token_repetition_penalty_sustain,
+                    req.token_repetition_penalty_decay,
+                )
+            )
         else:
             return model.generate(_MESSAGE, max_new_tokens)
     except Exception as e:
-        print('Exception', e)
+        print("Exception", e)
         return {"response": f"Exception while processing request: {e}"}
 
     finally:
@@ -174,7 +214,7 @@ async def stream_data(req: GenerateRequest):
 
 
 if __name__ == "__main__":
-    model = EXLlamaModel(args.directory, args.gpu_split)
+    model = CerberoModel()
 
     # -------
 
