@@ -12,10 +12,20 @@ from sentence_transformers import SentenceTransformer
 from functools import lru_cache
 from settings import AppSettings
 from retriever import DocumentRetriever
-from utils import get_facets_annotations, get_facets_metadata, get_hits
+from utils import (
+    get_facets_annotations,
+    get_facets_metadata,
+    get_hits,
+    get_facets_annotations_no_agg,
+)
 import torch
 from os import environ
 import json
+import os
+import logging
+from fastapi.responses import JSONResponse
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 @lru_cache()
@@ -131,46 +141,69 @@ class QueryCollectionRquest(BaseModel):
     include: List[str] = ["metadatas", "documents", "distances"]
 
 
-@app.post("/chroma/collection/{collection_name}/query")
+class CustomJSONResponse(JSONResponse):
+    media_type = "application/json"
+
+    def render(self, content: any) -> bytes:
+        return json.dumps(
+            content,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=None,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+
+@app.post(
+    "/chroma/collection/{collection_name}/query", response_class=CustomJSONResponse
+)
 async def query_collection(collection_name: str, req: QueryCollectionRquest):
     # try:
     # get most similar chunks
-    collection = chroma_client.get_collection(collection_name)
+    # collection = chroma_client.get_collection(collection_name)
     embeddings = []
 
     with torch.no_grad():
         # create embeddings for the query
         embeddings = model.encode(req.query)
     embeddings = embeddings.tolist()
-
-    result = collection.query(
-        query_embeddings=embeddings,
-        n_results=req.k,
-        where=req.where,
-        include=req.include,
-    )
+    print(len(embeddings))
+    query_body = {
+        "knn": {
+            "inner_hits": {
+                "_source": False,
+                "fields": ["chunks.vectors.text", "_score"],
+            },
+            "field": "chunks.vectors.predicted_value",  # Replace with your vector field name
+            "query_vector": embeddings,
+            "k": 5,  # Number of nearest neighbors to return (adjust as needed)
+        },
+    }
+    results = es_client.search(index="dave-documents", body=query_body)
 
     del embeddings
 
     doc_chunk_ids_map = {}
+    for hit in results["hits"]["hits"]:
+        doc_id = hit["_source"]["id"]
+        for chunk in hit["inner_hits"]["chunks.vectors"]["hits"]["hits"]:
+            chunk_text = chunk["fields"]["chunks"][0]["vectors"][0]["text"][0]
+            chunk = {
+                "id": doc_id,
+                "distance": hit["_score"],
+                "text": chunk_text,
+                "metadata": {"doc_id": doc_id, "chunk_size": len(chunk_text)},
+            }
 
-    for index, metadata in enumerate(result["metadatas"][0]):
-        chunk = {
-            "id": result["ids"][0][index],
-            "distance": result["distances"][0][index],
-            "metadata": metadata,
-            "text": result["documents"][0][index],
-        }
-
-        if metadata["doc_id"] in doc_chunk_ids_map:
-            doc_chunk_ids_map[metadata["doc_id"]].append(chunk)
+        if doc_id in doc_chunk_ids_map:
+            doc_chunk_ids_map[doc_id].append(chunk)
         else:
-            doc_chunk_ids_map[metadata["doc_id"]] = [chunk]
+            doc_chunk_ids_map[doc_id] = [chunk]
+    full_docs = []
 
     # get full documents from db
     doc_ids = list(doc_chunk_ids_map.keys())
 
-    full_docs = []
     for doc_id in doc_ids:
         d = retriever.retrieve(doc_id)
         # d = requests.get(
@@ -244,10 +277,12 @@ def delete_elastic_index(index_name):
 class IndexElasticDocumentRequest(BaseModel):
     doc: dict
 
+
 def index_elastic_document_raw(doc, index_name):
     res = es_client.index(index=index_name, document=doc)
     es_client.indices.refresh(index=index_name)
     return res["result"]
+
 
 @app.post("/elastic/index/{index_name}/doc")
 def index_elastic_document(req: IndexElasticDocumentRequest, index_name):
@@ -271,8 +306,10 @@ def index_elastic_document(req: IndexElasticDocumentRequest, index_name):
     # except Exception as e:
     #     raise HTTPException(status_code=500, detail=req.embeddings)
 
+
 def ogg2name(ogg):
-    return ogg2name_index.get(ogg, 'UNKNOWN')
+    return ogg2name_index.get(ogg, "UNKNOWN")
+
 
 def tipodoc2name(tipo):
     # TODO
@@ -280,9 +317,9 @@ def tipodoc2name(tipo):
         return "Sentenza"
     else:
         return tipo
-    
 
-def anonymize(s, s_type='persona', anonymize_type=["persona"]):
+
+def anonymize(s, s_type="persona", anonymize_type=["persona"]):
     if s_type in anonymize_type:
         words = s.split()
         new_words = ["".join([word[0]] + ["*" * (len(word) - 1)]) for word in words]
@@ -290,43 +327,49 @@ def anonymize(s, s_type='persona', anonymize_type=["persona"]):
     else:
         return s
 
+
 @app.post("/elastic/index/{index_name}/doc/mongo")
 def index_elastic_document_mongo(req: IndexElasticDocumentRequest, index_name):
     METADATA_MAP = {
-            'annosentenza': 'Anno Sentenza',
-            'annoruolo': 'Anno Rouolo',
-            'codiceoggetto': lambda x: ogg2name(x),
-            'parte': 'Parte',
-            'controparte': 'Controparte',
-            'nomegiudice': 'Nome Giudice',
-            'tipodocumento': lambda x: tipodoc2name(x),
-            }
+        "annosentenza": "Anno Sentenza",
+        "annoruolo": "Anno Rouolo",
+        "codiceoggetto": lambda x: ogg2name(x),
+        "parte": "Parte",
+        "controparte": "Controparte",
+        "nomegiudice": "Nome Giudice",
+        "tipodocumento": lambda x: tipodoc2name(x),
+    }
 
     mongo_doc = req.doc
 
     doc = {}
-    doc['mongo_id'] = mongo_doc['id']
-    doc['name'] = mongo_doc['name']
-    doc['text'] = mongo_doc['text']
-    doc['metadata'] = [{'type': mk, 'value': mv} for mk, mv in mongo_doc['features'].items() if mk in METADATA_MAP]
+    doc["mongo_id"] = mongo_doc["id"]
+    doc["name"] = mongo_doc["name"]
+    doc["text"] = mongo_doc["text"]
+    doc["metadata"] = [
+        {"type": mk, "value": mv}
+        for mk, mv in mongo_doc["features"].items()
+        if mk in METADATA_MAP
+    ]
 
-    doc['annotations'] = [
-            {
-                "id": cluster["id"],
-                # this will be a real ER id when it exists
-                "id_ER": cluster["id"],
-                "start": 0,
-                "end": 0,
-                "type": cluster["type"],
-                "mention": cluster["title"],
-                "is_linked": bool(cluster.get("url", False)),
-                # this is temporary, there will be a display name directly in the annotaion object
-                "display_name": anonymize(cluster['type'], cluster["title"]),
-            }
-            for cluster in mongo_doc['features']['clusters']['entities_merged']
-        ]
+    doc["annotations"] = [
+        {
+            "id": cluster["id"],
+            # this will be a real ER id when it exists
+            "id_ER": cluster["id"],
+            "start": 0,
+            "end": 0,
+            "type": cluster["type"],
+            "mention": cluster["title"],
+            "is_linked": bool(cluster.get("url", False)),
+            # this is temporary, there will be a display name directly in the annotaion object
+            "display_name": anonymize(cluster["type"], cluster["title"]),
+        }
+        for cluster in mongo_doc["features"]["clusters"]["entities_merged"]
+    ]
 
     return index_elastic_document_raw(doc, index_name)
+
 
 class QueryElasticIndexRequest(BaseModel):
     text: str
@@ -342,20 +385,14 @@ async def query_elastic_index(
     index_name: str,
     req: QueryElasticIndexRequest,
 ):
+    print("received request", req.dict())
     from_offset = (req.page - 1) * req.documents_per_page
 
     # build a query that retrieve conditions based AND conditions between text, annotation facets and metadata facets
     query = {
         "bool": {
-            "must": [
-                {
-                    "query_string": {
-                        "query": req.text,
-                        "default_field": "text"
-                    }
-                }
-            ]
-        }
+            "must": [{"query_string": {"query": req.text, "default_field": "text"}}]
+        },
     }
 
     if req.annotations != None and len(req.annotations) > 0:
@@ -400,60 +437,63 @@ async def query_elastic_index(
 
     search_res = es_client.search(
         index=index_name,
-        size=req.documents_per_page,
+        size=20,
+        # source_excludes=["text"],
         from_=from_offset,
         query=query,
-        aggs={
-            "metadata": {
-                "nested": {"path": "metadata"},
-                "aggs": {
-                    "types": {
-                        "terms": {"field": "metadata.type", "size": req.n_facets},
-                        "aggs": {
-                            "values": {
-                                "terms": {
-                                    "field": "metadata.value",
-                                    "size": req.n_facets,
-                                    "order": {"_key": "asc"},
-                                }
-                            }
-                        },
-                    }
-                },
-            },
-            "annotations": {
-                "nested": {"path": "annotations"},
-                "aggs": {
-                    "types": {
-                        "terms": {"field": "annotations.type", "size": req.n_facets},
-                        "aggs": {
-                            "mentions": {
-                                "terms": {
-                                    "field": "annotations.id_ER",
-                                    "size": req.n_facets,
-                                },
-                                "aggs": {
-                                    "top_hits_per_mention": {
-                                        "top_hits": {
-                                            "_source": [
-                                                "annotations.display_name",
-                                                "annotations.is_linked",
-                                            ],
-                                            "size": 1,
-                                        }
-                                    }
-                                },
-                            }
-                        },
-                    }
-                },
-            },
-        },
+        # aggs={
+        #     "metadata": {
+        #         "nested": {"path": "metadata"},
+        #         "aggs": {
+        #             "types": {
+        #                 "terms": {"field": "metadata.type", "size": req.n_facets},
+        #                 "aggs": {
+        #                     "values": {
+        #                         "terms": {
+        #                             "field": "metadata.value",
+        #                             "size": req.n_facets,
+        #                             # "order": {"_key": "asc"},
+        #                         }
+        #                     }
+        #                 },
+        #             }
+        #         },
+        #     },
+        #     "annotations": {
+        #         "nested": {"path": "annotations"},
+        #         "aggs": {
+        #             "types": {
+        #                 "terms": {"field": "annotations.type", "size": req.n_facets},
+        #                 "aggs": {
+        #                     "mentions": {
+        #                         "terms": {
+        #                             "field": "annotations.id_ER",
+        #                             "size": req.n_facets,
+        #                         },
+        #                         "aggs": {
+        #                             "top_hits_per_mention": {
+        #                                 "top_hits": {
+        #                                     "_source": [
+        #                                         "annotations.display_name",
+        #                                         "annotations.is_linked",
+        #                                     ],
+        #                                     "size": 1,
+        #                                 }
+        #                             }
+        #                         },
+        #                     }
+        #                 },
+        #             }
+        #         },
+        #     },
+        # },
     )
 
     hits = get_hits(search_res)
-    annotations_facets = get_facets_annotations(search_res)
-    metadata_facets = get_facets_metadata(search_res)
+
+    annotations_facets = get_facets_annotations_no_agg(search_res)
+
+    # metadata_facets = get_facets_metadata(search_res)
     total_hits = search_res["hits"]["total"]["value"]
     num_pages = total_hits // req.documents_per_page
     if (
@@ -463,7 +503,7 @@ async def query_elastic_index(
 
     return {
         "hits": hits,
-        "facets": {"annotations": annotations_facets, "metadata": metadata_facets},
+        "facets": {"annotations": annotations_facets, "metadata": []},
         "pagination": {
             "current_page": req.page,
             "total_pages": num_pages,
@@ -474,30 +514,49 @@ async def query_elastic_index(
 
 if __name__ == "__main__":
     settings = get_settings()
+    print(settings.dict())
+    logger = logging.getLogger(__name__)
 
-    model = SentenceTransformer(settings.embedding_model, device="cuda")
+    # if not os.getenv("ENVIRONMENT", "production") == "dev":
+    model = SentenceTransformer("intfloat/multilingual-e5-base", device="cuda")
 
-    model = model.to(environ.get('SENTENCE_TRANSFORMER_DEVICE', 'cuda'))
-    print('model on device', model.device)
+    model = model.to(environ.get("SENTENCE_TRANSFORMER_DEVICE", "cuda"))
+    print("model on device", model.device)
     model = model.eval()
+    # chroma_client = chromadb.Client(
+    #     Settings(
+    #         chroma_server_host=settings.host_base_url,
+    #         chroma_server_http_port=settings.chroma_port,
+    #     )
+    # )
+    # collections = chroma_client.get_collections()
 
-    chroma_client = chromadb.Client(
-        Settings(
-            chroma_api_impl="rest",
-            chroma_server_host=settings.host_base_url,
-            chroma_server_http_port=settings.chroma_port,
-        )
-    )
+    # Print each collection
+    # for collection in collections:
+    #     print(collection)
+    print("starting es client")
     es_client = Elasticsearch(
-        hosts=[{"host": "es", "scheme": "http", "port": int(settings.elastic_port)}],
+        hosts=[
+            {
+                # "host": (
+                #     "es"
+                #     if not os.getenv("ENVIRONMENT", "production") == "dev"
+                #     else "localhost"
+                # ),
+                "host": "localhost",
+                "scheme": "http",
+                "port": int(settings.elastic_port),
+            }
+        ],
         request_timeout=60,
     )
 
-    DOCS_BASE_URL = "http://" + settings.host_base_url + ":" + settings.docs_port
-    retriever = DocumentRetriever(url=DOCS_BASE_URL + "/api/mongo/document")
-
-    with open(environ.get('OGG2NAME_INDEX'), 'r') as fd:
-        ogg2name_index = json.load(fd)
+    DOCS_BASE_URL = "http://" + "localhost" + ":" + "3001"
+    print(DOCS_BASE_URL)
+    retriever = DocumentRetriever(url=DOCS_BASE_URL + "/api/document")
+    if not os.getenv("ENVIRONMENT", "production") == "dev":
+        with open(environ.get("OGG2NAME_INDEX"), "r") as fd:
+            ogg2name_index = json.load(fd)
 
     # [start fastapi]:
     _PORT = int(settings.indexer_server_port)

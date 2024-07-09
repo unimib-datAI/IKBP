@@ -7,4 +7,9 @@ class DocumentRetriever:
 
     def retrieve(self, id: str):
         res = requests.get(self.url + "/" + str(id))
-        return res.json()
+        doc = res.json()
+        try:
+            del doc["annotation_sets"]
+        except KeyError:
+            pass
+        return doc
