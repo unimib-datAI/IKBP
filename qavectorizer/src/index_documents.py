@@ -10,22 +10,22 @@ DOCS_BASE_URL = "http://" + settings.host_base_url + ":" + settings.docs_port
 INDEX_COLLECTION_NAME = settings.index_collection_name
 
 retriever = DocumentRetriever(url=DOCS_BASE_URL + "/api/mongo/document")
-chroma_indexer = ChromaIndexer(
-    settings.embedding_model,
-    chunk_size=settings.chunk_size,
-    chunk_overlap=settings.chunk_overlap,
-)
+#chroma_indexer = ChromaIndexer(
+#    settings.embedding_model,
+#    chunk_size=settings.chunk_size,
+#    chunk_overlap=settings.chunk_overlap,
+#)
 elastic_indexer = ElasticsearchIndexer(anonymize_type=[])
 
 # create indexes if they do not exist
-chroma_indexer.create_index(INDEX_COLLECTION_NAME)
+#chroma_indexer.create_index(INDEX_COLLECTION_NAME)
 elastic_indexer.create_index(INDEX_COLLECTION_NAME)
 
 print("Start indexing")
 domains = ["dummy"]
 # index 100 documents for each domain
 for domain in domains:
-    documents = requests.get(DOCS_BASE_URL + "/api/mongo/document?limit=60")
+    documents = requests.get(DOCS_BASE_URL + "/api/mongo/document?limit=2000")
     documents = documents.json()["docs"]
 
     print("Indexing documents for domain: " + domain)
@@ -46,15 +46,15 @@ for domain in domains:
             newtext = newtext[:-1]
             current_doc['text'] = newtext
             # # index chunks for the document
-            chroma_indexer.index(
-                collection="test",
-                doc=current_doc,
-                metadata={
-                    "doc_id": doc_id,
-                    "chunk_size": settings.chunk_size,
-                    "domain": domain,
-                },
-            )
+            #chroma_indexer.index(
+            #    collection="test",
+            #    doc=current_doc,
+            #    metadata={
+            #        "doc_id": doc_id,
+            #        "chunk_size": settings.chunk_size,
+            #        "domain": domain,
+            #    },
+            #)
             # index elastic
             elastic_indexer.index(index="test", doc=current_doc)
         except Exception as e:
