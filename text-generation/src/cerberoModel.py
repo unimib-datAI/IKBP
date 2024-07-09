@@ -2,11 +2,8 @@ from __future__ import annotations
 import os, glob
 
 from prompts import llama_v2_prompt, cerbero_prompt
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
 from llama_cpp import Llama
 from huggingface_hub import hf_hub_download
-import json
 import asyncio
 
 
