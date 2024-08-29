@@ -12,12 +12,12 @@ class AppSettings(BaseSettings):
     # port where chromadb runs
     chroma_port: str = os.getenv("CHROMA_PORT", "8000")
     # port where elastic runs
-    elastic_port: str = os.getenv("ELASTIC_PORT", "9200")
+    elastic_port: str = os.getenv("ELASTIC_PORT", "9201")
     # the mebedding models used, if you change the model you also have the re-index documents
     embedding_model: str = os.getenv(
         "SENTENCE_TRANSFORMER_EMBEDDING_MODEL",
         # "efederici/sentence-BERTino-v2-pt",
-        "efederici/sentence-IT5-base"
+        "efederici/sentence-IT5-base",
         # "nickprock/mmarco-bert-base-italian-uncased",
     )
     chunk_size: int = 200
