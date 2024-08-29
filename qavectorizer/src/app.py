@@ -48,15 +48,14 @@ class CreateCollectionRequest(BaseModel):
     name: str
 
 
-
 class IndexDocumentRequest(BaseModel):
     embeddings: List[List[float]]
     documents: List[str]
     metadatas: List[dict] = []
 
-
 class QueryCollectionRquest(BaseModel):
     query: str
+    filter_ids: List[str] = []
     k: int = 5
     where: dict = None
     include: List[str] = ["metadatas", "documents", "distances"]
@@ -87,19 +86,73 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
         embeddings = model.encode(req.query)
     embeddings = embeddings.tolist()
     print(len(embeddings))
-    query_body = {
-        "knn": {
-            "inner_hits": {
-                "_source": False,
-                "fields": ["chunks.vectors.text", "_score"],
+    query_body = None
+    if hasattr(req, "filter_ids") and len(req.filter_ids) > 0:
+        # query_body = {
+        #     "query": {
+        #         "terms": {"id": [int(doc_id) for doc_id in req.filter_ids]},
+        #     },
+        #     "knn": {
+        #         "inner_hits": {
+        #             "_source": False,
+        #             "fields": ["chunks.vectors.text", "_score"],
+        #         },
+        #         "field": "chunks.vectors.predicted_value",
+        #         "query_vector": embeddings,
+        #         "k": 5,
+        #     },
+        # }
+        query_body = {
+            "knn": {
+                "inner_hits": {
+                    "_source": False,
+                    "fields": ["chunks.vectors.text", "_score"],
+                    "size": 10,
+                },
+                "field": "chunks.vectors.predicted_value",  # Replace with your vector field name
+                "query_vector": embeddings,
+                "k": 10,
+                "num_candidates": 1000,  # Number of nearest neighbors to return (adjust as needed)
+                "filter": {"terms": {"id": [int(doc_id) for doc_id in req.filter_ids]}},
             },
-            "field": "chunks.vectors.predicted_value",  # Replace with your vector field name
-            "query_vector": embeddings,
-            "k": 5,  # Number of nearest neighbors to return (adjust as needed)
-        },
-    }
-    results = es_client.search(index=collection_name, body=query_body)
+        }
+        # query_body = {
+        #     "query": {
+        #         "bool": {
+        #             "filter": [
+        #                 {"terms": {"id": [int(doc_id) for doc_id in req.filter_ids]}},
+        #                 {
+        #                     "knn": {
+        # "inner_hits": {
+        #     "_source": False,
+        #     "fields": ["chunks.vectors.text", "_score"],
+        # },
+        #                         "field": "chunks.vectors.predicted_value",
+        #                         "query_vector": embeddings,
+        #                         "k": 5,
+        #                     }
+        #                 },
+        #             ]
+        #         }
+        #     }
+        # }
 
+    else:
+
+        query_body = {
+            "knn": {
+                "inner_hits": {
+                    "_source": False,
+                    "fields": ["chunks.vectors.text", "_score"],
+                },
+                "field": "chunks.vectors.predicted_value",  # Replace with your vector field name
+                "query_vector": embeddings,
+                "k": 5,  # Number of nearest neighbors to return (adjust as needed)
+            },
+        }
+    print("query body", query_body)
+    results = es_client.search(index=collection_name, body=query_body)
+    print("results", results)
     del embeddings
 
     doc_chunk_ids_map = {}
@@ -107,17 +160,17 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
         doc_id = hit["_source"]["id"]
         for chunk in hit["inner_hits"]["chunks.vectors"]["hits"]["hits"]:
             chunk_text = chunk["fields"]["chunks"][0]["vectors"][0]["text"][0]
-            chunk = {
+            temp_chunk = {
                 "id": doc_id,
                 "distance": hit["_score"],
                 "text": chunk_text,
                 "metadata": {"doc_id": doc_id, "chunk_size": len(chunk_text)},
             }
 
-        if doc_id in doc_chunk_ids_map:
-            doc_chunk_ids_map[doc_id].append(chunk)
-        else:
-            doc_chunk_ids_map[doc_id] = [chunk]
+            if doc_id in doc_chunk_ids_map:
+                doc_chunk_ids_map[doc_id].append(temp_chunk)
+            else:
+                doc_chunk_ids_map[doc_id] = [temp_chunk]
     full_docs = []
 
     # get full documents from db
@@ -290,10 +343,9 @@ async def query_elastic_index(
     print("received request", req.dict())
     from_offset = (req.page - 1) * req.documents_per_page
 
-    # build a query that retrieve conditions based AND conditions between text, annotation facets and metadata facets
     query = {
         "bool": {
-            "must": [{"query_string": {"query": req.text, "default_field": "text"}}]
+            "must": [{"query_string": {"query": req.text, "default_field": "text"}}],
         },
     }
 
@@ -430,7 +482,7 @@ if __name__ == "__main__":
     # Print each collection
     # for collection in collections:
     #     print(collection)
-    print("starting es client")
+    print("starting es client", settings.elastic_port)
     es_client = Elasticsearch(
         hosts=[
             {
@@ -445,9 +497,9 @@ if __name__ == "__main__":
     DOCS_BASE_URL = "http://" + "documents" + ":" + "3001"
     print(DOCS_BASE_URL)
     retriever = DocumentRetriever(url=DOCS_BASE_URL + "/api/document")
-    if not os.getenv("ENVIRONMENT", "production") == "dev":
-        with open(environ.get("OGG2NAME_INDEX"), "r") as fd:
-            ogg2name_index = json.load(fd)
+    # if not os.getenv("ENVIRONMENT", "production") == "dev":
+    #     with open(environ.get("OGG2NAME_INDEX"), "r") as fd:
+    #         ogg2name_index = json.load(fd)
 
     # [start fastapi]:
     _PORT = int(settings.indexer_server_port)
