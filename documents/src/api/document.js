@@ -216,7 +216,67 @@ export default (app) => {
       return res.json(document).status(200);
     })
   );
+  route.post(
+    "/:id/move-entities",
+    validateRequest({
+      req: {
+        body: z.object({
+          entities: z.array(z.number()),
+          annotationSet: z.string(),
+          sourceCluster: z.number(),
+          destinationCluster: z.number(),
+        }),
+      },
+    }),
+    asyncRoute(async (req, res, next) => {
+      const { id } = req.params;
+      console.log("doc id", id);
+      const document = await getDocumentById(id);
 
+      const { entities, annotationSet, sourceCluster, destinationCluster } =
+        req.body;
+
+      //find and delete source and destination clusters
+      let source = document.features.clusters[annotationSet].find(
+        (cluster) => cluster.id === sourceCluster
+      );
+      document.features.clusters[annotationSet] = document.features.clusters[
+        annotationSet
+      ].filter((cluster) => cluster.id !== sourceCluster);
+      let dest = document.features.clusters[annotationSet].find(
+        (cluster) => cluster.id === destinationCluster
+      );
+      document.features.clusters[annotationSet] = document.features.clusters[
+        annotationSet
+      ].filter((cluster) => cluster.id !== destinationCluster);
+      //move entities
+      let entObjects = source.mentions.filter((mention) =>
+        entities.includes(mention.id)
+      );
+      source.mentions = source.mentions.filter(
+        (mention) => !entities.includes(mention.id)
+      );
+      dest.mentions = dest.mentions.concat(entObjects);
+      let clusters = [
+        ...document.features.clusters[annotationSet],
+        source,
+        dest,
+      ];
+      let result = await DocumentController.updateClusters(
+        id,
+        annotationSet,
+        clusters
+      );
+      
+      let doc = await getDocumentById(id);
+      console.log("doc", doc.features.clusters[annotationSet]);
+      return res.json(doc).status(200);
+      //   let entObjects = [];
+      //   for(let i=0; i<entities.length; i++){
+    })
+  );
+
+  async function moveEntities() {}
   /**
    * Get document by id anonymous
    */
