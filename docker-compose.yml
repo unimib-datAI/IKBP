@@ -23,37 +23,18 @@ services:
     volumes:
       - ./mongo/data:/data/db
       - ./mongo/initdb.d:/docker-entrypoint-initdb.d/
+    ports:
+      - 127.0.0.1:27017:27017
 
   documents:
     restart: $RESTART_POLICY
     build: documents
     environment:
-      PORT: 3001
+      DOCS_PORT: 3001
       ENABLE_AUTH: false
       MONGO: $MONGO
     volumes:
       - ./documents/src:/app/src
-
-  biencoder:
-    restart: $RESTART_POLICY
-    #image: rpozzi/blink_biencoder
-    build:
-      context: ./biencoder
-      dockerfile: Dockerfile
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-      - ./biencoder/main.py:/home/app/main.py
-    environment:
-      PYTHONPATH: /home/app
-      BIENCODER_MODEL: $BIENCODER_MODEL
-      BIENCODER_CONFIG: $BIENCODER_CONFIG
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [ gpu ]
-    # command: python main.py --host 0.0.0.0 --port 80 --biencoder_model $BIENCODER_MODEL --biencoder_config $BIENCODER_CONFIG
-    # command: sleep 3600
 
   indexer:
     restart: $RESTART_POLICY
@@ -72,82 +53,6 @@ services:
     depends_on:
       - postgres
     # command: python main.py --host 0.0.0.0 --port 80 --index $INDEXER_INDEX --postgres postgres://postgres:$POSTGRES_PASSWORD@postgres:5432/postgres --vector-size $INDEXER_VECTOR_SIZE --language $INDEXER_LANGUAGE
-
-  clustering:
-    restart: $RESTART_POLICY
-    #image: rpozzi/blink_nilcluster
-    build:
-        context: ./clustering
-        dockerfile: Dockerfile
-    volumes:
-      - ./clustering/main.py:/home/app/main.py
-      - ./clustering/utils.py:/home/app/utils.py
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-    environment:
-      CLUSTERING_MODEL: $CLUSTERING_MODEL
-    # command: sleep 7200
-    # command: python main.py --host 0.0.0.0 --port 80
-
-  interessati:
-    restart: $RESTART_POLICY
-    #image: rpozzi/blink_nilcluster
-    build:
-        context: ./interessati
-        dockerfile: Dockerfile
-    volumes:
-      - ./interessati/main.py:/home/app/main.py
-      - ./interessati/utils.py:/home/app/utils.py
-    # command: sleep 7200
-    # command: python main.py --host 0.0.0.0 --port 80
-
-  consolidation:
-    restart: $RESTART_POLICY
-    #image: rpozzi/blink_nilcluster
-    build:
-        context: ./consolidation
-        dockerfile: Dockerfile
-    volumes:
-      - ./consolidation/main.py:/home/app/main.py
-      - ./consolidation/utils.py:/home/app/utils.py
-    # command: sleep 7200
-    # command: python main.py --host 0.0.0.0 --port 80
-
-  nilpredictor:
-    restart: $RESTART_POLICY
-    #image: rpozzi/blink_nilpredictor
-    build:
-        context: ./nilpredictor
-        dockerfile: Dockerfile
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-      - ./nilpredictor/main.py:/home/app/main.py
-    environment:
-      NILPREDICTOR_ARGS: $NILPREDICTOR_ARGS
-    # command: python main.py --host 0.0.0.0 --port 80 $NILPREDICTOR_ARGS
-
-  sectionator:
-    restart: $RESTART_POLICY
-    build:
-      context: ./sectionator
-      dockerfile: Dockerfile
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-      - ./sectionator/main.py:/home/app/main.py
-    environment:
-      DISTRIBUZIONE_TERRITORIALE_UFFICI: $SECTIONATOR_DISTRIBUZIONE_TERRITORIALE_UFFICI
-
-  specialization:
-    restart: $RESTART_POLICY
-    build:
-      context: ./specialization
-      dockerfile: Dockerfile
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-      - ./specialization/main.py:/home/app/main.py
-      - ./specialization/fakeCandidates.py:/home/app/fakeCandidates.py
-    environment:
-      PIPELINE_ADDRESS: $PIPELINE_ADDRESS
-      # command: sleep 7200
 
   pipeline:
     restart: $RESTART_POLICY
@@ -204,6 +109,7 @@ services:
         NEXT_PUBLIC_FULL_PATH: $UI_NEXT_PUBLIC_FULL_PATH
         API_LLM: $UI_API_LLM
         API_INDEXER: $UI_API_INDEXER
+        VARIANT: $UI_VARIANT
     ports:
       - $LISTEN_UI:3000
     environment:
@@ -218,6 +124,7 @@ services:
       NEXT_PUBLIC_FULL_PATH: $UI_NEXT_PUBLIC_FULL_PATH
       API_LLM: $UI_API_LLM
       API_INDEXER: $UI_API_INDEXER
+      VARIANT: $UI_VARIANT
 
     volumes:
       - ./giustizia-ui/modules:/app/modules
@@ -236,33 +143,16 @@ services:
             - driver: nvidia
               capabilities: [ gpu ]
     environment:
-      - MODEL_NAME=${TEXT_GENERATION_MODEL}
-      - GPU_SPLITS=${TEXT_GENERATION_GPU_SPLITS}
+      # - MODEL_NAME=${TEXT_GENERATION_MODEL}
+      - GPU_LAYERS=${TEXT_GENERATION_GPU_LAYERS}
     ports:
       - $TEXT_GENERATION_ADDR:7862
     volumes:
       - ./models/text-generation:/workspace/models
       # - ./text-generation/src:/workspace
 
-  localai:
-    image: quay.io/go-skynet/local-ai:v2.0.0-cublas-cuda11
-    tty: true # enable colorized logs
-    restart: $RESTART_POLICY
-    volumes:
-      - ./models/localai/models:/models
-      - ./models/localai/images/:/tmp/generated/images/
-    command: ["/usr/bin/local-ai" ]
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              capabilities: [ gpu ]
-    ports:
-      - $LOCALAI_ADDR:7862
-
   es:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.7.0
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.3
     restart: $RESTART_POLICY
     environment:
       - xpack.security.enabled=false
@@ -308,39 +198,3 @@ services:
       - ./qavectorizer/src:/workspace
       - ./models:/root/models
       - ./models/qavectorizer:/root/.cache/huggingface
-
-######
-
-  chroma:
-    build:
-      context: chroma/chroma
-      dockerfile: Dockerfile
-    volumes:
-      - ./chroma/chroma:/chroma
-      - ./chroma-volumes/index_data:/chroma/.chroma/index
-    command: uvicorn chromadb.app:app --reload --workers 1 --host 0.0.0.0 --port 8000 --log-config log_config.yml
-    environment:
-      - CHROMA_DB_IMPL=clickhouse
-      - CLICKHOUSE_HOST=clickhouse
-      - CLICKHOUSE_PORT=8123
-    ports:
-      - ${CROMA_LISTEN_ADDR}:8000
-    depends_on:
-      - clickhouse
-
-  clickhouse:
-    image: clickhouse/clickhouse-server:22.9-alpine
-    environment:
-      - ALLOW_EMPTY_PASSWORD=yes
-      - CLICKHOUSE_TCP_PORT=9000
-      - CLICKHOUSE_HTTP_PORT=8123
-        #ports:
-        #- '8123:8123'
-        #- '9000:9000'
-    volumes:
-      - ./chroma-volumes/clickhouse/data:/var/lib/clickhouse
-      - ./chroma-volumes/clickhouse/logs:/var/log/clickhouse-server
-      - ./chroma-volumes/clickhouse/backups:/backups
-      - ./chroma/chroma/config/backup_disk.xml:/etc/clickhouse-server/config.d/backup_disk.xml
-      - ./chroma/chroma/config/chroma_users.xml:/etc/clickhouse-server/users.d/chroma.xml
-

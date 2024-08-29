@@ -22,18 +22,8 @@ from cerberoModel import CerberoModel
 # exllama imports:
 
 import argparse
-import torch
 import sys
 import os
-
-
-# [init torch]:
-torch.set_grad_enabled(False)
-torch.cuda._lazy_init()
-torch.backends.cuda.matmul.allow_tf32 = True
-# torch.backends.cuda.matmul.allow_fp16_reduced_precision_reduction = True
-torch.set_printoptions(precision=10)
-torch_devices = [f"cuda:{i}" for i in range(torch.cuda.device_count())]
 
 # [Parse arguments]:
 parser = argparse.ArgumentParser(description="Simple FastAPI wrapper for ExLlama")
@@ -45,10 +35,11 @@ parser.add_argument(
     help="Path to directory containing config.json, model.tokenizer and * .safetensors",
 )
 parser.add_argument(
-    "-gs",
-    "--gpu_split",
-    type=str,
-    help="Comma-separated list of VRAM (in GB) to use per GPU device for model layers, e.g. -gs 20,7,7",
+    "-gl",
+    "--gpu_layers",
+    type=int,
+    default=-1,
+    help="Number of layers to put in GPU; -1 for all.",
 )
 
 args = parser.parse_args()
@@ -214,7 +205,7 @@ async def stream_data_test(req: GenerateRequest):
 
 
 if __name__ == "__main__":
-    model = CerberoModel()
+    model = CerberoModel(args.gpu_layers)
 
     # -------
 
