@@ -18,6 +18,7 @@ from fastapi import FastAPI, HTTPException, Request
 # from EXLlamaModel import EXLlamaModel
 # from exllama.generator import ExLlamaGenerator
 from cerberoModel import CerberoModel
+from PhiModel import PhiModel
 
 # exllama imports:
 
@@ -205,7 +206,7 @@ async def stream_data_test(req: GenerateRequest):
 
 
 if __name__ == "__main__":
-    model = CerberoModel(args.gpu_layers)
+    model = PhiModel(args.gpu_layers)
 
     # -------
 
