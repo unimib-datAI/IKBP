@@ -100,7 +100,7 @@ services:
       args:
         ACCESS_USERNAME: $UI_ACCESS_USERNAME
         ACCESS_PASSWORD: $UI_ACCESS_PASSWORD
-        API_BASE_URI: ${PIPELINE_ADDRESS}/api
+        API_BASE_URI: ${PIPELINE_ADDRESS}/api/mongo
         API_USERNAME: ""
         API_PASSWORD: ""
         NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
@@ -110,12 +110,14 @@ services:
         API_LLM: $UI_API_LLM
         API_INDEXER: $UI_API_INDEXER
         VARIANT: $UI_VARIANT
+        TEXT_GENERATION: $TEXT_GENERATION_ADDR
     ports:
       - $LISTEN_UI:3000
+      - 127.0.0.1:9229:9229
     environment:
       ACCESS_USERNAME: $UI_ACCESS_USERNAME
       ACCESS_PASSWORD: $UI_ACCESS_PASSWORD
-      API_BASE_URI: ${PIPELINE_ADDRESS}/api
+      API_BASE_URI: ${PIPELINE_ADDRESS}/api/mongo
       API_USERNAME: ""
       API_PASSWORD: ""
       NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
@@ -125,12 +127,16 @@ services:
       API_LLM: $UI_API_LLM
       API_INDEXER: $UI_API_INDEXER
       VARIANT: $UI_VARIANT
+      TEXT_GENERATION: $TEXT_GENERATION_ADDR
 
     volumes:
       - ./giustizia-ui/modules:/app/modules
       - ./giustizia-ui/server:/app/server
       - ./giustizia-ui/pages:/app/pages
-        #command: sleep 7200
+      - ./giustizia-ui/components:/app/components
+      - ./giustizia-ui/lib:/app/lib
+      - ./giustizia-ui/package.json:/app/package.json
+    # command: sleep 7200
 
   text-generation:
     build:
@@ -146,7 +152,7 @@ services:
       # - MODEL_NAME=${TEXT_GENERATION_MODEL}
       - GPU_LAYERS=${TEXT_GENERATION_GPU_LAYERS}
     ports:
-      - $TEXT_GENERATION_ADDR:7862
+      - $TEXT_GENERATION_PORT:7862
     volumes:
       - ./models/text-generation:/workspace/models
       # - ./text-generation/src:/workspace
@@ -166,7 +172,7 @@ services:
       - discovery.type=single-node
       - ES_JAVA_OPTS=-Xms4096m -Xmx4096m
     ports:
-      - ${ELASTIC_PORT}:${ELASTIC_PORT}
+      - ${ELASTIC_PORT}:9200
     volumes:
       - ./elasticsearch/data:/usr/share/elasticsearch/data
 
