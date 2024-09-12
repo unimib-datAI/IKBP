@@ -7,13 +7,13 @@ from huggingface_hub import hf_hub_download
 import asyncio
 
 
-class CerberoModel:
+class PhiModel:
     def __init__(self, n_gpu_layers=-1):
 
         self.llm = Llama(
             model_path=hf_hub_download(
-                repo_id="galatolo/cerbero-7b-openchat-gguf",
-                filename="ggml-model-Q8_0.gguf",
+                repo_id="QuantFactory/Phi-3.5-mini-ITA-GGUF",
+                filename="Phi-3.5-mini-ITA.Q8_0.gguf",
             ),
             n_ctx=8192,
             n_gpu_layers=n_gpu_layers,
