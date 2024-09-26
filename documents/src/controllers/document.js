@@ -4,6 +4,8 @@ import { HTTPError, HTTP_ERROR_CODES } from "../utils/http-error";
 import { annotationSetDTO } from "../models/annotationSet";
 import { AnnotationSetController } from "./annotationSet";
 import { Annotation, annotationDTO } from "../models/annotation";
+import { Message } from "../models/message.js";
+import { Persons } from "../models/person.js";
 
 export const DocumentController = {
   updateClusters: async (docId, annSet, clusters) => {
@@ -65,6 +67,35 @@ export const DocumentController = {
         message: `Document with id '${id}' was not found.`,
       });
     }
+    let messages = [];
+    console.log("messages", messages[0]);
+    let text = doc.intro;
+    if (doc.messages) {
+      messages = await Message.find({ _id: { $in: doc.messages } }).sort({
+        sequence_number: 1,
+      });
+      for (let i = 0; i < messages.length; i++) {
+        let ts = formatTimestamp(messages[i].timestamp);
+        let sender = await Persons.findOne({ _id: messages[i].sender["_id"] });
+        let receiver = await Persons.findOne({
+          _id: messages[i].receiver["_id"],
+        });
+        messages[i].sender = sender;
+        messages[i].receiver = receiver;
+
+        text += "-----------------------------\n";
+        text += `${sender.name}\n`;
+        text += `Timestamp: ${messages[i].timestamp}\n`;
+        if (messages[i].type === "Allegato") {
+          text += `Allegato: ${messages[i].path}\n`;
+          text += `Contenuto: ${messages[i].contenuto}\n`;
+          text += "\n";
+        } else {
+          text += `Messaggio: \n${messages[i].contenuto}\n`;
+        }
+      }
+      doc.text = text;
+    }
 
     const annotationSets = await AnnotationSet.find({ docId: id }).lean();
 
@@ -118,3 +149,17 @@ export const DocumentController = {
     return Promise.all(updaters);
   },
 };
+function formatTimestamp(timestamp) {
+  const date = new Date(timestamp); // Create a Date object from the timestamp
+
+  // Extract components
+  const day = String(date.getUTCDate()).padStart(2, "0"); // Get day and pad with zero if needed
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0"); // Get month (0-indexed) and pad
+  const year = date.getUTCFullYear(); // Get full year
+  const hours = String(date.getUTCHours()).padStart(2, "0"); // Get hours in UTC and pad
+  const minutes = String(date.getUTCMinutes()).padStart(2, "0"); // Get minutes in UTC and pad
+  const seconds = String(date.getUTCSeconds()).padStart(2, "0"); // Get seconds in UTC and pad
+
+  // Format the final string
+  return `${month}/${day}/${year} ${hours}:${minutes}:${seconds} +0000`;
+}

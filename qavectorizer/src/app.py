@@ -43,7 +43,6 @@ app.add_middleware(
 )
 
 
-
 class CreateCollectionRequest(BaseModel):
     name: str
 
@@ -52,6 +51,7 @@ class IndexDocumentRequest(BaseModel):
     embeddings: List[List[float]]
     documents: List[str]
     metadatas: List[dict] = []
+
 
 class QueryCollectionRquest(BaseModel):
     query: str
@@ -259,7 +259,6 @@ def index_elastic_document_raw(doc, index_name):
 @app.post("/elastic/index/{index_name}/doc")
 def index_elastic_document(req: IndexElasticDocumentRequest, index_name):
     return index_elastic_document_raw(req.doc, index_name)
-
 
 
 def ogg2name(ogg):
@@ -478,17 +477,21 @@ if __name__ == "__main__":
     print("model on device", model.device)
     model = model.eval()
 
-
     # Print each collection
     # for collection in collections:
     #     print(collection)
-    print("starting es client", settings.elastic_port)
+    elastic_host = "es"
+    elastic_port = 9200
+    if os.getenv("ENVIRONMENT", "production") == "dev":
+        elastic_host = "localhost"
+        elastic_port = 9201
+    print("starting es client", settings.elastic_port, elastic_host)
     es_client = Elasticsearch(
         hosts=[
             {
-                "host": "es",
+                "host": elastic_host,
                 "scheme": "http",
-                "port": 9200,
+                "port": elastic_port,
             }
         ],
         request_timeout=60,
@@ -496,6 +499,8 @@ if __name__ == "__main__":
 
     DOCS_BASE_URL = "http://" + "documents" + ":" + "3001"
     print(DOCS_BASE_URL)
+    if os.getenv("ENVIRONMENT", "production") == "dev":
+        DOCS_BASE_URL = "http://" + "localhost" + ":" + "3001"
     retriever = DocumentRetriever(url=DOCS_BASE_URL + "/api/document")
     # if not os.getenv("ENVIRONMENT", "production") == "dev":
     #     with open(environ.get("OGG2NAME_INDEX"), "r") as fd:
