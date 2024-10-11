@@ -71,15 +71,32 @@ export const DocumentController = {
     console.log("messages", messages[0]);
     let text = doc.intro;
     if (doc.messages) {
-      messages = await Message.find({ _id: { $in: doc.messages } }).sort({
-        sequence_number: 1,
-      });
+      messages = await Message.find({ _id: { $in: doc.messages } })
+        .sort({
+          sequence_number: 1,
+        })
+        .lean();
+      let persons = [];
+      let firstMessage = messages[0];
+      let person1 = await Persons.findOne({
+        _id: messages[0].sender["_id"],
+      }).lean();
+      let person2 = await Persons.findOne({
+        _id: messages[0].receiver["_id"],
+      }).lean();
+      persons.push(person1);
+      persons.push(person2);
+      console.log("messages", messages.length);
       for (let i = 0; i < messages.length; i++) {
-        let ts = formatTimestamp(messages[i].timestamp);
-        let sender = await Persons.findOne({ _id: messages[i].sender["_id"] });
-        let receiver = await Persons.findOne({
-          _id: messages[i].receiver["_id"],
+        let sender = persons.find((person) => {
+          return person._id.equals(messages[i].sender);
         });
+        let receiver = persons.find((person) => {
+          return person._id.equals(messages[i].receiver);
+        });
+        if (messages.length === 156) {
+          console.log("messages", messages[i]);
+        }
         messages[i].sender = sender;
         messages[i].receiver = receiver;
 
@@ -88,10 +105,9 @@ export const DocumentController = {
         text += `Timestamp: ${messages[i].timestamp}\n`;
         if (messages[i].type === "Allegato") {
           text += `Allegato: ${messages[i].path}\n`;
-          text += `Contenuto: ${messages[i].contenuto}\n`;
-          text += "\n";
+          text += `Contenuto:\n${messages[i].contenuto?.trim()}\n`;
         } else {
-          text += `Messaggio: \n${messages[i].contenuto}\n`;
+          text += `Messaggio: \n${messages[i].contenuto?.trim()}\n`;
         }
       }
       doc.text = text;

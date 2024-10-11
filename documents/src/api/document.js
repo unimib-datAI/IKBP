@@ -212,7 +212,6 @@ export default (app) => {
       const { id } = req.params;
       console.log("doc id", id);
       const document = await getDocumentById(id);
-      console.log("doc", document);
       return res.json(document).status(200);
     })
   );
@@ -267,7 +266,7 @@ export default (app) => {
         annotationSet,
         clusters
       );
-      
+
       let doc = await getDocumentById(id);
       console.log("doc", doc.features.clusters[annotationSet]);
       return res.json(doc).status(200);
