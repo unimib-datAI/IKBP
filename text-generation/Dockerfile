@@ -1,20 +1,27 @@
-FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
+ARG CUDA_IMAGE="12.2.2-devel-ubuntu22.04"
+FROM nvidia/cuda:${CUDA_IMAGE}
 
-ENV DEBIAN_FRONTEND=noninteractive \
-    TORCH_CUDA_ARCH_LIST="Pascal;Volta;Turing" \
-    CUDA_HOME=/usr/local/cuda \
-    PATH=$CUDA_HOME/bin:$PATH
+# We need to set the host to 0.0.0.0 to allow outside access
+ENV HOST 0.0.0.0
+
+RUN apt-get update && apt-get upgrade -y \
+    && apt-get install -y git build-essential \
+    python3 python3-pip gcc wget \
+    ocl-icd-opencl-dev opencl-headers clinfo \
+    libclblast-dev libopenblas-dev \
+    && mkdir -p /etc/OpenCL/vendors && echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
+
+# setting build related env vars
+ENV CUDA_DOCKER_ARCH=all
+ENV LLAMA_CUBLAS=1
+
+# Install depencencies
+RUN python3 -m pip install --upgrade pip pytest cmake scikit-build setuptools fastapi uvicorn sse-starlette pydantic-settings starlette-context
+
+# Install llama-cpp-python (build with cuda)
+RUN CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python
 
 WORKDIR /workspace
-
-RUN apt-get update && apt-get install -y --no-install-recommends wget libxml2-dev gnupg2 gcc g++ software-properties-common ninja-build \
-    && wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin \
-    && mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 \
-    && apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub \
-    && add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /" \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends cuda-toolkit-11-7 \
-    && rm -rf /var/lib/apt/lists/*
 
 COPY ./requirements.txt ./src .
 
@@ -22,4 +29,4 @@ RUN pip install --no-cache-dir -r ./requirements.txt
 
 EXPOSE 7862
 
-CMD python app.py -d ./models/${MODEL_NAME} -gs "${GPU_SPLITS}"
+CMD python3 app.py -d ./models/${MODEL_NAME} -gl "${GPU_LAYERS}"
