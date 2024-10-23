@@ -23,7 +23,8 @@ services:
     volumes:
       - ./mongo/data:/data/db
       - ./mongo/initdb.d:/docker-entrypoint-initdb.d/
-
+    ports:
+      - 127.0.0.1:27017:27017
   documents:
     restart: $RESTART_POLICY
     build: documents
@@ -72,6 +73,7 @@ services:
     depends_on:
       - postgres
     # command: python main.py --host 0.0.0.0 --port 80 --index $INDEXER_INDEX --postgres postgres://postgres:$POSTGRES_PASSWORD@postgres:5432/postgres --vector-size $INDEXER_VECTOR_SIZE --language $INDEXER_LANGUAGE
+    # command: sleep 3600
 
   clustering:
     restart: $RESTART_POLICY
@@ -259,10 +261,14 @@ services:
             - driver: nvidia
               capabilities: [ gpu ]
     ports:
-      - $LOCALAI_ADDR:7862
+      - $LOCALAI_ADDR:8080
+    environment:
+      MODELS_PATH: $LOCALAI_MODELS_PATH
+      BUILD_TYPE: $LOCALAI_BUILD_TYPE
+
 
   es:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.7.0
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.3
     restart: $RESTART_POLICY
     environment:
       - xpack.security.enabled=false
