@@ -449,7 +449,7 @@ if __name__ == "__main__":
     es_client = Elasticsearch(
         hosts=[
             {
-                "host": "localhost",
+                "host": "es",
                 "scheme": "http",
                 "port": 9200,
             }
@@ -457,7 +457,7 @@ if __name__ == "__main__":
         request_timeout=60,
     )
 
-    DOCS_BASE_URL = "http://" + "localhost" + ":" + "3001"
+    DOCS_BASE_URL = "http://" + "documents" + ":" + "3001"
     print(DOCS_BASE_URL)
     retriever = DocumentRetriever(url=DOCS_BASE_URL + "/api/document")
     # if not os.getenv("ENVIRONMENT", "production") == "dev":
