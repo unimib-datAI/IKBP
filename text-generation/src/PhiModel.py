@@ -47,24 +47,28 @@ class PhiModel:
     ):
         print("stream", inputs)
         max_new_tokens = min(max_new_tokens, 4096)
-        stream = self.llm(
-            inputs,
-            max_tokens=max_new_tokens,
-            temperature=temperature,
-            top_k=top_k,
-            top_p=top_p,
-            repeat_penalty=token_repetition_penalty_max,
-            min_p=min_p,
-            # stop=["[|Assistente|]", "[/USER]", "[/INST]", "[INST]", "[|Umano|]"],
-            stream=True,
-        )
-        for output in stream:
-            print(output["choices"][0]["text"])
-            yield output["choices"][0]["text"]
-            await asyncio.sleep(0.01)
-            # stop if the output is empty
-            if not output:
-                break
+        try:
+            stream = self.llm(
+                inputs,
+                max_tokens=max_new_tokens,
+                temperature=temperature,
+                top_k=top_k,
+                top_p=top_p,
+                repeat_penalty=token_repetition_penalty_max,
+                min_p=min_p,
+                # stop=["[|Assistente|]", "[/USER]", "[/INST]", "[INST]", "[|Umano|]"],
+                stream=True,
+            )
+            for output in stream:
+                print(output["choices"][0]["text"])
+                yield output["choices"][0]["text"]
+                await asyncio.sleep(0.01)
+                # stop if the output is empty
+                if not output:
+                    break
+        except Exception as e:
+            print(e)
+            yield "Error"
 
     def generate(self, inputs, max_new_tokens):
         # No streaming, using generate_simple:

@@ -43,7 +43,6 @@ app.add_middleware(
 )
 
 
-
 class CreateCollectionRequest(BaseModel):
     name: str
 
@@ -52,6 +51,7 @@ class IndexDocumentRequest(BaseModel):
     embeddings: List[List[float]]
     documents: List[str]
     metadatas: List[dict] = []
+
 
 class QueryCollectionRquest(BaseModel):
     query: str
@@ -88,55 +88,21 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
     print(len(embeddings))
     query_body = None
     if hasattr(req, "filter_ids") and len(req.filter_ids) > 0:
-        # query_body = {
-        #     "query": {
-        #         "terms": {"id": [int(doc_id) for doc_id in req.filter_ids]},
-        #     },
-        #     "knn": {
-        #         "inner_hits": {
-        #             "_source": False,
-        #             "fields": ["chunks.vectors.text", "_score"],
-        #         },
-        #         "field": "chunks.vectors.predicted_value",
-        #         "query_vector": embeddings,
-        #         "k": 5,
-        #     },
-        # }
+
         query_body = {
             "knn": {
                 "inner_hits": {
                     "_source": False,
                     "fields": ["chunks.vectors.text", "_score"],
-                    "size": 10,
+                    # "size": 10,
                 },
                 "field": "chunks.vectors.predicted_value",  # Replace with your vector field name
                 "query_vector": embeddings,
-                "k": 10,
-                "num_candidates": 1000,  # Number of nearest neighbors to return (adjust as needed)
+                "k": 5,
+                # "num_candidates": 1000,  # Number of nearest neighbors to return (adjust as needed)
                 "filter": {"terms": {"id": [int(doc_id) for doc_id in req.filter_ids]}},
             },
         }
-        # query_body = {
-        #     "query": {
-        #         "bool": {
-        #             "filter": [
-        #                 {"terms": {"id": [int(doc_id) for doc_id in req.filter_ids]}},
-        #                 {
-        #                     "knn": {
-        # "inner_hits": {
-        #     "_source": False,
-        #     "fields": ["chunks.vectors.text", "_score"],
-        # },
-        #                         "field": "chunks.vectors.predicted_value",
-        #                         "query_vector": embeddings,
-        #                         "k": 5,
-        #                     }
-        #                 },
-        #             ]
-        #         }
-        #     }
-        # }
-
     else:
 
         query_body = {
@@ -152,7 +118,6 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
         }
     print("query body", query_body)
     results = es_client.search(index=collection_name, body=query_body)
-    print("results", results)
     del embeddings
 
     doc_chunk_ids_map = {}
@@ -259,7 +224,6 @@ def index_elastic_document_raw(doc, index_name):
 @app.post("/elastic/index/{index_name}/doc")
 def index_elastic_document(req: IndexElasticDocumentRequest, index_name):
     return index_elastic_document_raw(req.doc, index_name)
-
 
 
 def ogg2name(ogg):
@@ -478,7 +442,6 @@ if __name__ == "__main__":
     print("model on device", model.device)
     model = model.eval()
 
-
     # Print each collection
     # for collection in collections:
     #     print(collection)
@@ -486,7 +449,7 @@ if __name__ == "__main__":
     es_client = Elasticsearch(
         hosts=[
             {
-                "host": "es",
+                "host": "localhost",
                 "scheme": "http",
                 "port": 9200,
             }
@@ -494,7 +457,7 @@ if __name__ == "__main__":
         request_timeout=60,
     )
 
-    DOCS_BASE_URL = "http://" + "documents" + ":" + "3001"
+    DOCS_BASE_URL = "http://" + "localhost" + ":" + "3001"
     print(DOCS_BASE_URL)
     retriever = DocumentRetriever(url=DOCS_BASE_URL + "/api/document")
     # if not os.getenv("ENVIRONMENT", "production") == "dev":
