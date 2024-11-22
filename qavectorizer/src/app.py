@@ -14,6 +14,7 @@ from utils import (
     get_facets_metadata,
     get_hits,
     get_facets_annotations_no_agg,
+    get_senders_and_receivers,
 )
 import torch
 from os import environ
@@ -85,7 +86,6 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
         # create embeddings for the query
         embeddings = model.encode(req.query)
     embeddings = embeddings.tolist()
-    print(len(embeddings))
     query_body = None
     if hasattr(req, "filter_ids") and len(req.filter_ids) > 0:
         # query_body = {
@@ -453,10 +453,15 @@ async def query_elastic_index(
         total_hits % req.documents_per_page > 0
     ):  # if there is a remainder, add one more page
         num_pages += 1
-
+    senders, receivers = get_senders_and_receivers(hits)
     return {
         "hits": hits,
-        "facets": {"annotations": annotations_facets, "metadata": []},
+        "facets": {
+            "annotations": annotations_facets,
+            "metadata": [],
+            "senders": senders,
+            "receivers": receivers,
+        },
         "pagination": {
             "current_page": req.page,
             "total_pages": num_pages,
@@ -471,9 +476,9 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
 
     # if not os.getenv("ENVIRONMENT", "production") == "dev":
-    model = SentenceTransformer("intfloat/multilingual-e5-base", device="cuda")
+    model = SentenceTransformer("thenlper/gte-base", device="cuda")
 
-    model = model.to(environ.get("SENTENCE_TRANSFORMER_DEVICE", "cuda"))
+    # model = model.to(environ.get("SENTENCE_TRANSFORMER_DEVICE", "cuda"))
     print("model on device", model.device)
     model = model.eval()
 
@@ -484,7 +489,7 @@ if __name__ == "__main__":
     elastic_port = 9200
     if os.getenv("ENVIRONMENT", "production") == "dev":
         elastic_host = "localhost"
-        elastic_port = 9201
+        elastic_port = 9200
     print("starting es client", settings.elastic_port, elastic_host)
     es_client = Elasticsearch(
         hosts=[

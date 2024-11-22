@@ -5,6 +5,9 @@ def get_hits(search_res):
     def convert_hit(hit):
         text = hit["_source"].pop("text")
         rest = {**hit["_source"]}
+        rest["mongo_id"] = rest["mongoId"]
+        rest["name"] = f'{rest["sender"]} -> {rest["receiver"]} \n {rest["timestamp"]}'
+        del rest["mongoId"]
         del rest["annotations"]
         del rest["chunks"]
         return {"_id": hit["_id"], "text": text[:150], **rest}
@@ -86,6 +89,20 @@ def get_facets_annotations_no_agg(hits):
         final_bucket["n_children"] = len(children)
         ann_facets.append(final_bucket)
     return ann_facets
+
+
+def get_senders_and_receivers(hits):
+    senders = []
+    receivers = []
+    for document in hits:
+        if "sender" in document:
+            senders.append(document["sender"])
+        if "receiver" in document:
+            receivers.append(document["receiver"])
+    senders = list(set(senders))
+    receivers = list(set(receivers))
+
+    return [senders, receivers]
 
 
 def get_facets_metadata(search_res):

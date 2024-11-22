@@ -60,7 +60,8 @@ export const DocumentController = {
     return Document.paginate(query, options);
   },
   findOne: async (id) => {
-    const doc = await Document.findOne({ id }).lean();
+    const doc = await Document.findOne({ id: id }).lean();
+
     if (!doc) {
       throw new HTTPError({
         code: HTTP_ERROR_CODES.NOT_FOUND,
