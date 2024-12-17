@@ -67,6 +67,7 @@ export default (app) => {
    */
   async function getDocumentById(id, anonymous = false, clusters = false) {
     const document = await DocumentController.findOne(id);
+    console.log("doc found");
     // convert annotation_sets from list to object
     var new_sets = {};
     for (const annset of document.annotation_sets) {

@@ -9,7 +9,7 @@ import mongoose, { Schema } from 'mongoose';
 // })
 
 const annotationSetSchema = new Schema({
-  docId: Number,
+  docId: String,
   name: String, // always the same as the identifier ?
   // annotations: [annotationSchema],
   // annotations: [Object],

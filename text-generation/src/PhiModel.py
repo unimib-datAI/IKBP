@@ -56,7 +56,7 @@ class PhiModel:
                 top_p=top_p,
                 repeat_penalty=token_repetition_penalty_max,
                 min_p=min_p,
-                # stop=["[|Assistente|]", "[/USER]", "[/INST]", "[INST]", "[|Umano|]"],
+                stop=["[|Assistente|]", "[/USER]", "[/INST]", "[INST]", "[|Umano|]", "[/INST]"],
                 stream=True,
             )
             for output in stream:

@@ -4,7 +4,7 @@ import paginate from 'mongoose-paginate-v2';
 
 const schema = new mongoose.Schema({
   id: {
-    type: Number,
+    type: String,
     required: false
   },
   name: String,
