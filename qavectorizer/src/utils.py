@@ -89,21 +89,49 @@ def get_facets_annotations_no_agg(hits):
 
 
 def get_facets_metadata(search_res):
-    def convert_annotation_bucket(bucket):
-        # filter empty velues. Some documents may not have some metadata
-        children = [x for x in bucket["values"]["buckets"] if x["key"] != ""]
 
-        return {
-            "key": bucket["key"],
-            "n_children": len(children),
-            "doc_count": bucket["doc_count"],
-            "children": children,
-        }
+    metadata_type_buckets = {}
+    for document in search_res["hits"]["hits"]:
+        if "metadata" not in document["_source"]:
+            continue
+        for mention in document["_source"]["metadata"]:
+            if mention["type"] not in metadata_type_buckets:
+                metadata_type_buckets[mention["type"]] = []
+            metadata_type_buckets[mention["type"]].append(mention)
 
-    return [
-        convert_annotation_bucket(bucket)
-        for bucket in search_res["aggregations"]["metadata"]["types"]["buckets"]
-    ]
+    metadata_facets = []
+
+    for bucket_key in metadata_type_buckets.keys():
+        final_bucket = {}
+        final_bucket["key"] = bucket_key
+
+        final_bucket["doc_count"] = len(metadata_type_buckets[bucket_key])
+        aggregated_data = {}
+
+        # Loop through the list of objects
+        for obj in metadata_type_buckets[bucket_key]:
+            # If the 'name' of the object is not in the dictionary, add the object to the dictionary
+            if obj["value"] not in aggregated_data:
+                appended_obj = obj
+                appended_obj["doc_count"] = 1
+                aggregated_data[obj["value"]] = obj
+            else:
+                # If the 'name' of the object is already in the dictionary, increment the count
+                aggregated_data[obj["value"]]["doc_count"] += 1
+        children = []
+        for mention in aggregated_data.keys():
+            ment = aggregated_data[mention]
+            child = {
+                "key": mention,
+                "display_name": mention,
+                "doc_count": ment["doc_count"],
+            }
+            children.append(child)
+        final_bucket["children"] = children
+        final_bucket["n_children"] = len(children)
+        metadata_facets.append(final_bucket)
+    return metadata_facets
+    
 
 
 def anonymize(s):

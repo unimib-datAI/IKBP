@@ -87,6 +87,7 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
     embeddings = embeddings.tolist()
     print(len(embeddings))
     query_body = None
+    query_full_text = None
     if hasattr(req, "filter_ids") and len(req.filter_ids) > 0:
 
         query_body = {
@@ -100,12 +101,41 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
                 "query_vector": embeddings,
                 "k": 5,
                 # "num_candidates": 1000,  # Number of nearest neighbors to return (adjust as needed)
-                "filter": {"terms": {"id": [int(doc_id) for doc_id in req.filter_ids]}},
+                "filter": {"terms": {"id": [doc_id for doc_id in req.filter_ids]}},
             },
         }
+        query_full_text = {
+    "_source": ["id"],
+    "query": {
+        "nested": {
+            "path": "chunks.vectors",
+            "query": {
+                "bool": {
+                    "must": [
+                        {
+                            "bool": {
+                                "should": [
+                                    {"match": {"chunks.vectors.text": req.query}},
+                                    {"match": {"chunks.vectors.entities": req.query}}
+                                ]
+                            }
+                        },
+                        {"terms": {"id": [doc_id for doc_id in req.filter_ids]}}
+                    ]
+                }
+            },
+            "inner_hits": {
+                "_source": False,
+                "fields": ["chunks.vectors.text", "_score"]
+            }
+        }
+    }
+}
+
     else:
 
         query_body = {
+             "_source": ["id"],
             "knn": {
                 "inner_hits": {
                     "_source": False,
@@ -116,33 +146,104 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
                 "k": 5,  # Number of nearest neighbors to return (adjust as needed)
             },
         }
-    print("query body", query_body)
+        query_full_text = {
+    "_source": ["id"],
+    "query": {
+        "nested": {
+            "path": "chunks.vectors",
+            "query": {
+                "bool": {
+                    "should": [
+                        {"match": {"chunks.vectors.text": req.query}},
+                        {"match": {"chunks.vectors.entities": req.query}},
+                    ]
+                }
+            },
+            "inner_hits": {
+                "_source": False,
+                "fields": ["chunks.vectors.text", "_score"],
+            },
+        },
+      
+    },
+}
     results = es_client.search(index=collection_name, body=query_body)
+    response_full_text = es_client.search(index=collection_name, body=query_full_text)
     del embeddings
 
-    doc_chunk_ids_map = {}
-    for hit in results["hits"]["hits"]:
-        doc_id = hit["_source"]["id"]
-        for chunk in hit["inner_hits"]["chunks.vectors"]["hits"]["hits"]:
-            chunk_text = chunk["fields"]["chunks"][0]["vectors"][0]["text"][0]
-            temp_chunk = {
-                "id": doc_id,
-                "distance": hit["_score"],
-                "text": chunk_text,
-                "metadata": {"doc_id": doc_id, "chunk_size": len(chunk_text)},
-            }
+    # doc_chunk_ids_map = {}
+    # for hit in results["hits"]["hits"]:
+    #     doc_id = hit["_source"]["id"]
+    #     for chunk in hit["inner_hits"]["chunks.vectors"]["hits"]["hits"]:
+    #         chunk_text = chunk["fields"]["chunks"][0]["vectors"][0]["text"][0]
+    #         temp_chunk = {
+    #             "id": doc_id,
+    #             "distance": hit["_score"],
+    #             "text": chunk_text,
+    #             "metadata": {"doc_id": doc_id, "chunk_size": len(chunk_text)},
+    #         }
 
-            if doc_id in doc_chunk_ids_map:
-                doc_chunk_ids_map[doc_id].append(temp_chunk)
-            else:
-                doc_chunk_ids_map[doc_id] = [temp_chunk]
+    #         if doc_id in doc_chunk_ids_map:
+    #             doc_chunk_ids_map[doc_id].append(temp_chunk)
+    #         else:
+    #             doc_chunk_ids_map[doc_id] = [temp_chunk]
+    
+    def collect_chunk_ranks(response):
+        ranks = {}
+        for rank, hit in enumerate(response["hits"]["hits"]):
+            doc_id = hit['_source']["id"]
+            if "inner_hits" in hit and "chunks.vectors" in hit["inner_hits"]:
+                for chunk_hit in hit["inner_hits"]["chunks.vectors"]["hits"]["hits"]:
+                    chunk_id = chunk_hit["fields"]["chunks"][0]["vectors"][0]["text"][0]
+                    combined_id = (doc_id, chunk_id)
+                    ranks[combined_id] = rank + 1  # Avoid division by zero
+        return ranks
+
+
+    # Get chunk-level ranks for both searches
+    vector_ranks = collect_chunk_ranks(results)
+    full_text_ranks = collect_chunk_ranks(response_full_text)
+
+    # RRF Parameters
+    rrf_k = 60  # Adjust as needed
+
+    # Combine ranks using RRF at the chunk level
+    combined_scores = {}
+    all_chunk_ids = set(vector_ranks.keys()).union(full_text_ranks.keys())
+
+    for chunk_id in all_chunk_ids:
+        rank_vector = vector_ranks.get(chunk_id, float("inf"))
+        rank_full_text = full_text_ranks.get(chunk_id, float("inf"))
+        combined_scores[chunk_id] = (1 / (rrf_k + rank_vector)) + (
+            1 / (rrf_k + rank_full_text)
+        )
+
+    # Sort chunks by combined RRF scores
+    final_ranking = sorted(combined_scores.items(), key=lambda x: x[1], reverse=True)
+
+    # for rank, (doc_id, score) in enumerate(final_ranking[:20], start=1):
+    #     print(f"Rank: {rank}, Doc ID: {doc_id}, RRF Score: {score}")
+
+    doc_chunks_id_map = {}
+
+    for chunk in final_ranking[:15]:
+        doc_id = chunk[0][0]
+        temp_chunk = {
+            "id": doc_id,
+            "text": chunk[0][1],
+            "metadata": {"doc_id": doc_id, "chunk_size": len(chunk[0][1])},
+        }
+        if doc_id in doc_chunks_id_map:
+            doc_chunks_id_map[doc_id].append(temp_chunk)
+        else:
+            doc_chunks_id_map[doc_id] = [temp_chunk]
     full_docs = []
 
     # get full documents from db
-    doc_ids = list(doc_chunk_ids_map.keys())
+    doc_ids = list(doc_chunks_id_map.keys())
 
     for doc_id in doc_ids:
-        d = retriever.retrieve(doc_id)
+        d = retriever.retrieve(doc_id) if collection_name != "bologna" else retriever_bologna.retrieve(doc_id)
         # d = requests.get(
         #     "http://"
         #     + settings.host_base_url
@@ -154,9 +255,9 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
         full_docs.append(d)
 
     doc_results = []
-
+    print(doc_chunks_id_map.keys())
     for doc in full_docs:
-        doc_results.append({"doc": doc, "chunks": doc_chunk_ids_map[doc["id"]]})
+        doc_results.append({"doc": doc, "chunks": doc_chunks_id_map[doc["id"]]})
 
     return doc_results
 
@@ -321,14 +422,15 @@ async def query_elastic_index(
                         "path": "annotations",
                         "query": {
                             "bool": {
-                                "filter": [
+                                "should": [
                                     {
                                         "term": {
                                             "annotations.id_ER": annotation["value"]
                                         }
                                     },
                                     {"term": {"annotations.type": annotation["type"]}},
-                                ]
+                                ],
+                                 "minimum_should_match": 1
                             }
                         },
                     }
@@ -343,16 +445,19 @@ async def query_elastic_index(
                         "path": "metadata",
                         "query": {
                             "bool": {
-                                "filter": [
+                                "should": [
                                     {"term": {"metadata.value": metadata["value"]}},
                                     {"term": {"metadata.type": metadata["type"]}},
-                                ]
+                                ],
+                                 "minimum_should_match": 1
                             }
                         },
                     }
                 },
             )
-
+    # get all docs if req.text is empty
+    if req.text == "" or req.text == None or req.text == " ":
+        query = {"match_all": {}}
     search_res = es_client.search(
         index=index_name,
         size=20,
@@ -411,7 +516,7 @@ async def query_elastic_index(
 
     annotations_facets = get_facets_annotations_no_agg(search_res)
 
-    # metadata_facets = get_facets_metadata(search_res)
+    metadata_facets = get_facets_metadata(search_res)
     total_hits = search_res["hits"]["total"]["value"]
     num_pages = total_hits // req.documents_per_page
     if (
@@ -421,7 +526,7 @@ async def query_elastic_index(
 
     return {
         "hits": hits,
-        "facets": {"annotations": annotations_facets, "metadata": []},
+        "facets": {"annotations": annotations_facets, "metadata": metadata_facets},
         "pagination": {
             "current_page": req.page,
             "total_pages": num_pages,
@@ -436,7 +541,7 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
 
     # if not os.getenv("ENVIRONMENT", "production") == "dev":
-    model = SentenceTransformer("intfloat/multilingual-e5-base", device="cuda")
+    model = SentenceTransformer("Alibaba-NLP/gte-multilingual-base", device="cuda", trust_remote_code=True)
 
     model = model.to(environ.get("SENTENCE_TRANSFORMER_DEVICE", "cuda"))
     print("model on device", model.device)
@@ -458,8 +563,10 @@ if __name__ == "__main__":
     )
 
     DOCS_BASE_URL = "http://" + "documents" + ":" + "3001"
+    BOLOGNA_DOCS_BASE_URL = "http://" + "10.0.0.108" + ":" + "3002"
     print(DOCS_BASE_URL)
     retriever = DocumentRetriever(url=DOCS_BASE_URL + "/api/document")
+    retriever_bologna = DocumentRetriever(url=BOLOGNA_DOCS_BASE_URL + "/api/document")
     # if not os.getenv("ENVIRONMENT", "production") == "dev":
     #     with open(environ.get("OGG2NAME_INDEX"), "r") as fd:
     #         ogg2name_index = json.load(fd)

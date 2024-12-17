@@ -47,7 +47,7 @@ def reset_cluster_index(clusters, idx_dict, annset):
             ann = annset[idx_dict[mention['id']]]
             ann['features']['cluster'] = id
 
-def consolidation(doc, annset_name='entities_merged', output_annset_name='entities_consolidated',
+def consolidation(doc, annset_name='entities_', output_annset_name='entities_consolidated',
                   consolidate_linking=True, consolidate_types=True, merge_same_name=True, merge_similar_name=True):
 
     if not doc.get('features', {}).get('id'):
