@@ -1,4 +1,5 @@
 import argparse
+import os
 from fastapi import FastAPI, Body
 from pydantic import BaseModel
 import uvicorn
@@ -44,8 +45,8 @@ app = FastAPI()
 async def encode_mention_from_doc(doc: dict = Body(...)):
     doc = Document.from_dict(doc)
 
-    annsets_to_link = set([doc.features.get('annsets_to_link', 'entities_merged')])
-
+    annsets_to_link = set([doc.features.get('annsets_to_link', 'entities_')])
+    print('annsets_to_link:', annsets_to_link)
     samples = []
     mentions = []
 
@@ -53,7 +54,9 @@ async def encode_mention_from_doc(doc: dict = Body(...)):
         # if not annset_name.startswith('entities'):
         #     # considering only annotation sets of entities
         #     continue
+        doc
         for mention in doc.annset(annset_name):
+            print('mention:', mention)
             if 'linking' in mention.features and mention.features['linking'].get('skip', False):
                 # DATES should skip = true bcs linking useless
                 continue
@@ -77,6 +80,7 @@ async def encode_mention_from_doc(doc: dict = Body(...)):
         samples, biencoder.tokenizer, biencoder_params
     )
     encodings = _run_biencoder_mention(biencoder, dataloader)
+    print('encodings:', len(encodings))
     if len(encodings) > 0:
         assert encodings[0].dtype == 'float32'
     encodings = [vector_encode(e) for e in encodings]
@@ -160,6 +164,8 @@ def load_models(args):
     with open(args.biencoder_config) as json_file:
         biencoder_params = json.load(json_file)
         biencoder_params["path_to_model"] = args.biencoder_model
+        biencoder_params["use_cuda"] = torch.cuda.is_available()
+        biencoder_params["device"] = "cpu"
     biencoder = load_biencoder(biencoder_params)
     return biencoder, biencoder_params
 
@@ -190,8 +196,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     logger = logging.getLogger('biencoder_micros')
+    current_dir = os.getcwd()
+    print("Current Directory:", current_dir)
 
-    print('Loading biencoder...')
+    # List and print the contents of the directory
+    contents = os.listdir(current_dir+"/models")
+    print("Contents of the Current Directory:")
+    for item in contents:
+        print(item)
+    print('Loading biencoder...', args)
     biencoder, biencoder_params = load_models(args)
     print('Device:', biencoder.device)
     print('Loading complete.')

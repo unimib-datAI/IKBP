@@ -2,6 +2,11 @@ FROM rpozzi/blink:latest AS blink
 
 FROM python:3.8
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gnupg && \
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 648ACFD622F3D138 04EE7237B7D453EC && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 # Upgrade PIP
 RUN python3 -m pip install --upgrade pip
 

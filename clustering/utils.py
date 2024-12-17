@@ -57,7 +57,7 @@ def compute_similarity(idx_a, idx_b, text_a, text_b, matr_embd, decimal='', unca
         score = [round(s, decimal) for s in score]
     return score
 
-def make_clusters(doc_dict, model, annset_name='entities_merged', threshold=0.64, seed=11, separate_annset=False):
+def make_clusters(doc_dict, model, annset_name='entities_', threshold=0.64, seed=11, separate_annset=False):
     doc = Document.from_dict(doc_dict)
     annset = doc.annset(annset_name)
     matr_embd = np.array([vector_decode(ann.features['linking']['encoding']) for ann in annset])

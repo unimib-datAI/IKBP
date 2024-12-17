@@ -24,51 +24,57 @@ def restructure_newline(text):
 
 @app.post('/api/spacyner')
 async def encode_mention(doc: dict = Body(...)):
-    global model
-    global senter
-    global tag
-    global spacy_pipeline
+    print('handling ner for document')
+    try:
+        global model
+        global senter
+        global tag
+        global spacy_pipeline
 
-    # replace wrong newlines
-    text = restructure_newline(doc['text'])
+        # replace wrong newlines
+        text = restructure_newline(doc['text'])
 
-    doc = Document.from_dict(doc)
-    entity_set = doc.annset('entities_{}'.format(tag))
+        doc = Document.from_dict(doc)
+        entity_set = doc.annset('entities_{}'.format(tag))
 
-    spacy_out = spacy_pipeline(text)
+        spacy_out = spacy_pipeline(text)
 
-    # sentences
-    if senter:
-        sentence_set = doc.annset('sentences_{}'.format(tag))
-        for sent in spacy_out.sents:
-            # TODO keep track of entities in this sentence?
-            sentence_set.add(sent.start_char, sent.end_char, "sentence", {
-                "source": "spacy",
-                "spacy_model": model
-            })
+        # sentences
+        if senter:
+            sentence_set = doc.annset('sentences_{}'.format(tag))
+            for sent in spacy_out.sents:
+                # TODO keep track of entities in this sentence?
+                sentence_set.add(sent.start_char, sent.end_char, "sentence", {
+                    "source": "spacy",
+                    "spacy_model": model
+                })
 
-    for ent in spacy_out.ents:
-        # TODO keep track of sentences
-        # sentence_set.overlapping(ent.start_char, ent.end_char)
-        feat_to_add = {
-            "ner": {
-                "type": ent.label_,
-                "score": 1.0,
-                "source": "spacy",
-                "spacy_model": model
-                }}
-        if ent.label_ == 'DATE':
-            feat_to_add['linking'] = {
-                "skip": True
-            }
+        for ent in spacy_out.ents:
+            # TODO keep track of sentences
+            # sentence_set.overlapping(ent.start_char, ent.end_char)
+            feat_to_add = {
+                "ner": {
+                    "type": ent.label_,
+                    "score": 1.0,
+                    "source": "spacy",
+                    "spacy_model": model
+                    }}
+            if ent.label_ == 'DATE':
+                feat_to_add['linking'] = {
+                    "skip": True
+                }
 
-        entity_set.add(ent.start_char, ent.end_char, ent.label_, feat_to_add)
+            entity_set.add(ent.start_char, ent.end_char, ent.label_, feat_to_add)
 
-    if not 'pipeline' in doc.features:
-        doc.features['pipeline'] = []
-    doc.features['pipeline'].append('spacyner')
+        if not 'pipeline' in doc.features:
+            doc.features['pipeline'] = []
+        doc.features['pipeline'].append('spacyner')
 
-    return doc.to_dict()
+        return doc.to_dict()
+    except Exception as e:
+        print('Caught exception:', e)
+        return {'error': str(e)}
+         
 
 def initialize():
     global model
@@ -132,4 +138,14 @@ else:
     senter = os.environ.get('SPACY_SENTER', False)
     tag = os.environ.get('SPACY_TAG', 'merged')
     gpu_id = int(os.environ.get('SPACY_GPU', -1))
+    current_dir = os.getcwd()
+
+    # Print the current directory path
+    print("Current Directory:", current_dir)
+
+    # List and print the contents of the directory
+    contents = os.listdir(current_dir+"/models")
+    print("Contents of the Current Directory:")
+    for item in contents:
+        print(item)
     initialize()
