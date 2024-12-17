@@ -1,9 +1,10 @@
 version: "3"
 services:
-
   postgres:
     restart: $RESTART_POLICY
     image: postgres:14
+    networks:
+      - caddy_net
     environment:
       POSTGRES_PASSWORD: $POSTGRES_PASSWORD
     volumes:
@@ -35,16 +36,31 @@ services:
       MONGO: $MONGO
     volumes:
       - ./documents/src:/app/src
-
+    ports:
+      - 3001:3001
+  documents_demo:
+    restart: $RESTART_POLICY
+    build: documents
+    environment:
+      DOCS_PORT: 3001
+      ENABLE_AUTH: false
+      MONGO: $MONGO_DOCUMENTS
+    volumes:
+      - ./documents/src:/app/src
+    ports:
+      - 3002:3001
   indexer:
     restart: $RESTART_POLICY
     # image: rpozzi/blink_indexer
     build:
-        context: ./indexer
-        dockerfile: Dockerfile
+      context: ./indexer
+      dockerfile: Dockerfile
+    networks:
+      - caddy_net
     volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - /mnt/data/models:/home/app/models
       - ./indexer/main.py:/home/app/main.py
+
     environment:
       INDEXER_INDEX: $INDEXER_INDEX
       POSTGRES_PASSWORD: $POSTGRES_PASSWORD
@@ -73,25 +89,124 @@ services:
       SPACY_TIMEOUT: $SPACY_TIMEOUT
       SPACY_GPU: $SPACY_GPU
     volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - /mnt/data/models:/home/app/models
       - ./spacyner/main.py:/home/app/main.py
+    networks:
+      - caddy_net
+    ports:
+      - 3222:80
     deploy:
       resources:
         reservations:
           devices:
-            - capabilities: [ gpu ]
+            - capabilities: [gpu]
+  biencoder:
+    restart: $RESTART_POLICY
+    build: ./biencoder
+    environment:
+      BIENCODER_MODEL: $BIENCODER_MODEL
+      BIENCODER_CONFIG: $BIENCODER_CONFIG
+    networks:
+      - caddy_net
+    volumes:
+      - /mnt/data/models:/home/app/models
+      - ./biencoder/main.py:/home/app/main.py
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
     # command: python __main__.py --host 0.0.0.0 --port 80 --model $SPACY_MODEL
+  consolidation:
+    restart: $RESTART_POLICY
+    build: ./consolidation
+    networks:
+      - caddy_net
+    volumes:
+      - /mnt/data/models:/home/app/models
+      - ./consolidation/:/home/app/
 
+  nilpredictor:
+    restart: $RESTART_POLICY
+    build: ./nilpredictor
+    networks:
+      - caddy_net
+    environment:
+      NILPREDICTOR_ARGS: $NILPREDICTOR_ARGS
+    volumes:
+      - /mnt/data/models:/home/app/models
+      - ./nilpredictor/:/home/app/
+  clustering:
+    restart: $RESTART_POLICY
+    build: ./clustering
+    networks:
+      - caddy_net
+    environment:
+      CLUSTERING_MODEL: $CLUSTERING_MODEL
+    volumes:
+      - /mnt/data/models:/home/app/models
+      - ./clustering/:/home/app/
   caddy:
     restart: $RESTART_POLICY
     image: caddy:2
     ports:
-      - "$CADDY_LISTEN_HTTP:80"
+      - "10881:80"
+    networks:
+      - caddy_net
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile
       - ./caddy/site:/srv
       - ./caddy/data:/data
       - ./caddy/config:/config
+  ui_demo:
+    restart: $RESTART_POLICY
+    build:
+      context: giustizia-ui
+      args:
+        ACCESS_USERNAME: $UI_DEMO_ACCESS_USERNAME
+        ACCESS_PASSWORD: $UI_DEMO_ACCESS_PASSWORD
+        API_BASE_URI: ${DEMO_PIPELINE_ADDRESS}/api
+        API_USERNAME: ""
+        API_PASSWORD: ""
+        NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
+        NEXTAUTH_URL: $DEMO_UI_NEXTAUTH_URL
+        NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
+        NEXT_PUBLIC_FULL_PATH: $DEMO_UI_NEXT_PUBLIC_FULL_PATH
+        API_LLM: $UI_API_LLM
+        API_INDEXER: $UI_API_INDEXER
+        VARIANT: "bologna"
+        TEXT_GENERATION: $TEXT_GENERATION_ADDR
+        ELASTIC_INDEX: "bologna"
+    ports:
+      - $DEMO_LISTEN_UI:3000
+      # - 127.0.0.1:9229:9229
+    environment:
+      ACCESS_USERNAME: $UI_DEMO_ACCESS_USERNAME
+      ACCESS_PASSWORD: $UI_DEMO_ACCESS_PASSWORD
+      API_BASE_URI: ${DEMO_PIPELINE_ADDRESS}/api
+      API_USERNAME: ""
+      API_PASSWORD: ""
+      NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
+      NEXTAUTH_URL: $DEMO_UI_NEXTAUTH_URL
+      NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
+      NEXT_PUBLIC_FULL_PATH: $DEMO_UI_NEXT_PUBLIC_FULL_PATH
+      API_LLM: $UI_API_LLM
+      API_INDEXER: $UI_API_INDEXER
+      VARIANT: "bologna"
+      TEXT_GENERATION: $TEXT_GENERATION_ADDR
+      HOST: host.docker.internal
+      ELASTIC_INDEX: "bologna"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    volumes:
+      - ./giustizia-ui/modules:/app/modules
+      - ./giustizia-ui/server:/app/server
+      - ./giustizia-ui/pages:/app/pages
+      - ./giustizia-ui/components:/app/components
+      - ./giustizia-ui/lib:/app/lib
+      - ./giustizia-ui/package.json:/app/package.json
+    # command: sleep 7200
 
   ui:
     restart: $RESTART_POLICY
@@ -100,7 +215,7 @@ services:
       args:
         ACCESS_USERNAME: $UI_ACCESS_USERNAME
         ACCESS_PASSWORD: $UI_ACCESS_PASSWORD
-        API_BASE_URI: ${PIPELINE_ADDRESS}/api/mongo
+        API_BASE_URI: ${PIPELINE_ADDRESS}/api
         API_USERNAME: ""
         API_PASSWORD: ""
         NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
@@ -117,7 +232,7 @@ services:
     environment:
       ACCESS_USERNAME: $UI_ACCESS_USERNAME
       ACCESS_PASSWORD: $UI_ACCESS_PASSWORD
-      API_BASE_URI: ${PIPELINE_ADDRESS}/api/mongo
+      API_BASE_URI: ${PIPELINE_ADDRESS}/api
       API_USERNAME: ""
       API_PASSWORD: ""
       NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
@@ -128,6 +243,9 @@ services:
       API_INDEXER: $UI_API_INDEXER
       VARIANT: $UI_VARIANT
       TEXT_GENERATION: $TEXT_GENERATION_ADDR
+      HOST: host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
     volumes:
       - ./giustizia-ui/modules:/app/modules
@@ -142,17 +260,24 @@ services:
     build:
       context: ./text-generation
       dockerfile: Dockerfile
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           capabilities: [ gpu ]
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              capabilities: [ gpu ]
+              count: 1
+              capabilities: [gpu]
     environment:
       # - MODEL_NAME=${TEXT_GENERATION_MODEL}
       - GPU_LAYERS=${TEXT_GENERATION_GPU_LAYERS}
     ports:
-      - $TEXT_GENERATION_PORT:7862
+      - 10.0.0.108:7862:7862
     volumes:
       - ./models/text-generation:/workspace/models
       # - ./text-generation/src:/workspace
@@ -171,8 +296,9 @@ services:
       ###
       - discovery.type=single-node
       - ES_JAVA_OPTS=-Xms4096m -Xmx4096m
+      - http.max_content_length=200mb
     ports:
-      - ${ELASTIC_PORT}:9200
+      - 9201:9200
     volumes:
       - ./elasticsearch/data:/usr/share/elasticsearch/data
 
@@ -183,12 +309,19 @@ services:
     depends_on:
       - es
     restart: $RESTART_POLICY
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           capabilities: [ gpu ]
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              capabilities: [ gpu ]
+              count: 1
+              capabilities: [gpu]
     environment:
       - HOST_BASE_URL=${HOST_BASE_URL}
       - INDEXER_SERVER_PORT=7863
@@ -198,9 +331,13 @@ services:
       - SENTENCE_TRANSFORMER_EMBEDDING_MODEL=${SENTENCE_TRANSFORMER_EMBEDDING_MODEL}
       - SENTENCE_TRANSFORMER_DEVICE=${SENTENCE_TRANSFORMER_DEVICE}
       - OGG2NAME_INDEX=${OGG2NAME_INDEX}
+      - NVIDIA_VISIBLE_DEVICES=all
     ports:
       - ${QAVECTORIZER_ADDR}:7863
     volumes:
       - ./qavectorizer/src:/workspace
       - ./models:/root/models
       - ./models/qavectorizer:/root/.cache/huggingface
+networks:
+  caddy_net:
+    driver: bridge
