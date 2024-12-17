@@ -39,7 +39,10 @@ http:// {
 	handle /api/mergesets* {
 		reverse_proxy mergener:80
 	}
-	handle_path /api/mongo/* {
+	handle /api/mongo_demo* {
+		reverse_proxy documents_demo:3002
+	}
+	handle_path /api/mongo* {
 		rewrite * /api/{path}
 		reverse_proxy documents:3001
 	}
@@ -49,5 +52,5 @@ http:// {
 	handle /api/interessati* {
 		reverse_proxy interessati:80
 	}
-	respond "404 Not Found" 404
-}
+	
+
