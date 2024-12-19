@@ -59,6 +59,7 @@ class QueryCollectionRquest(BaseModel):
     k: int = 5
     where: dict = None
     include: List[str] = ["metadatas", "documents", "distances"]
+    retrievalMethod: str = "full"
 
 
 class CustomJSONResponse(JSONResponse):
@@ -80,7 +81,7 @@ class CustomJSONResponse(JSONResponse):
 async def query_collection(collection_name: str, req: QueryCollectionRquest):
 
     embeddings = []
-
+    print("query", req.dict())
     with torch.no_grad():
         # create embeddings for the query
         embeddings = model.encode(req.query)
@@ -88,8 +89,8 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
     print(len(embeddings))
     query_body = None
     query_full_text = None
-    if hasattr(req, "filter_ids") and len(req.filter_ids) > 0:
 
+    if hasattr(req, "filter_ids") and len(req.filter_ids) > 0:
         query_body = {
             "knn": {
                 "inner_hits": {
@@ -97,78 +98,119 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
                     "fields": ["chunks.vectors.text", "_score"],
                     # "size": 10,
                 },
-                "field": "chunks.vectors.predicted_value",  # Replace with your vector field name
+                "field": "chunks.vectors.predicted_value",
                 "query_vector": embeddings,
                 "k": 5,
-                # "num_candidates": 1000,  # Number of nearest neighbors to return (adjust as needed)
+                # "num_candidates": 1000,
                 "filter": {"terms": {"id": [doc_id for doc_id in req.filter_ids]}},
             },
         }
+
+        # excludes ner entities search if specified in retrieval method
+        should_query = (
+            [
+                {"match": {"chunks.vectors.text": req.query}},
+            ]
+            if req.retrievalMethod == "hibrid_no_ner"
+            else [
+                {"match": {"chunks.vectors.text": req.query}},
+                {"match": {"chunks.vectors.entities": req.query}},
+            ]
+        )
         query_full_text = {
-    "_source": ["id"],
-    "query": {
-        "nested": {
-            "path": "chunks.vectors",
+            "_source": ["id"],
             "query": {
-                "bool": {
-                    "must": [
-                        {
-                            "bool": {
-                                "should": [
-                                    {"match": {"chunks.vectors.text": req.query}},
-                                    {"match": {"chunks.vectors.entities": req.query}}
-                                ]
-                            }
-                        },
-                        {"terms": {"id": [doc_id for doc_id in req.filter_ids]}}
-                    ]
+                "nested": {
+                    "path": "chunks.vectors",
+                    "query": {
+                        "bool": {
+                            "must": [
+                                {"bool": {"should": should_query}},
+                                {
+                                    "terms": {
+                                        "id": [doc_id for doc_id in req.filter_ids]
+                                    }
+                                },
+                            ]
+                        }
+                    },
+                    "inner_hits": {
+                        "_source": False,
+                        "fields": ["chunks.vectors.text", "_score"],
+                    },
                 }
             },
-            "inner_hits": {
-                "_source": False,
-                "fields": ["chunks.vectors.text", "_score"]
-            }
         }
-    }
-}
 
     else:
-
         query_body = {
-             "_source": ["id"],
+            "_source": ["id"],
             "knn": {
                 "inner_hits": {
                     "_source": False,
                     "fields": ["chunks.vectors.text", "_score"],
                 },
-                "field": "chunks.vectors.predicted_value",  # Replace with your vector field name
+                "field": "chunks.vectors.predicted_value",
                 "query_vector": embeddings,
-                "k": 5,  # Number of nearest neighbors to return (adjust as needed)
+                "k": 5,
             },
         }
+
+        # excludes ner entities search if specified in retrieval method
+        should_query = (
+            [
+                {"match": {"chunks.vectors.text": req.query}},
+            ]
+            if req.retrievalMethod == "hibrid_no_ner"
+            else [
+                {"match": {"chunks.vectors.text": req.query}},
+                {"match": {"chunks.vectors.entities": req.query}},
+            ]
+        )
         query_full_text = {
-    "_source": ["id"],
-    "query": {
-        "nested": {
-            "path": "chunks.vectors",
+            "_source": ["id"],
             "query": {
-                "bool": {
-                    "should": [
-                        {"match": {"chunks.vectors.text": req.query}},
-                        {"match": {"chunks.vectors.entities": req.query}},
-                    ]
-                }
+                "nested": {
+                    "path": "chunks.vectors",
+                    "query": {"bool": {"should": should_query}},
+                    "inner_hits": {
+                        "_source": False,
+                        "fields": ["chunks.vectors.text", "_score"],
+                    },
+                },
             },
-            "inner_hits": {
-                "_source": False,
-                "fields": ["chunks.vectors.text", "_score"],
-            },
-        },
-      
-    },
-}
-    results = es_client.search(index=collection_name, body=query_body)
-    response_full_text = es_client.search(index=collection_name, body=query_full_text)
+        }
+
+    results = (
+        es_client.search(index=collection_name, body=query_body)
+        if req.retrievalMethod == "full"
+        or req.retrievalMethod == "dense"
+        or req.retrievalMethod == "hibrid_no_ner"
+        else []
+    )
+
+    # debug print statement for checking correct retrieval mode
+    if (
+        req.retrievalMethod != "full"
+        and req.retrievalMethod != "hibrid_no_ner"
+        and req.retrievalMethod != "dense"
+    ):
+        print("results", results)
+
+    # debug print statement for checking correct retrieval mode
+    response_full_text = (
+        es_client.search(index=collection_name, body=query_full_text)
+        if req.retrievalMethod == "full"
+        or req.retrievalMethod == "hibrid_no_ner"
+        or req.retrievalMethod == "full-text"
+        else []
+    )
+    if (
+        req.retrievalMethod != "full"
+        and req.retrievalMethod != "hibrid_no_ner"
+        and req.retrievalMethod != "full-text"
+    ):
+        print("response_full_text", response_full_text)
     del embeddings
 
     # doc_chunk_ids_map = {}
@@ -187,11 +229,11 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
     #             doc_chunk_ids_map[doc_id].append(temp_chunk)
     #         else:
     #             doc_chunk_ids_map[doc_id] = [temp_chunk]
-    
+
     def collect_chunk_ranks(response):
         ranks = {}
         for rank, hit in enumerate(response["hits"]["hits"]):
-            doc_id = hit['_source']["id"]
+            doc_id = hit["_source"]["id"]
             if "inner_hits" in hit and "chunks.vectors" in hit["inner_hits"]:
                 for chunk_hit in hit["inner_hits"]["chunks.vectors"]["hits"]["hits"]:
                     chunk_id = chunk_hit["fields"]["chunks"][0]["vectors"][0]["text"][0]
@@ -199,10 +241,11 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
                     ranks[combined_id] = rank + 1  # Avoid division by zero
         return ranks
 
-
     # Get chunk-level ranks for both searches
-    vector_ranks = collect_chunk_ranks(results)
-    full_text_ranks = collect_chunk_ranks(response_full_text)
+    vector_ranks = collect_chunk_ranks(results) if len(results) > 0 else {}
+    full_text_ranks = (
+        collect_chunk_ranks(response_full_text) if len(response_full_text) > 0 else {}
+    )
 
     # RRF Parameters
     rrf_k = 60  # Adjust as needed
@@ -243,7 +286,11 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
     doc_ids = list(doc_chunks_id_map.keys())
 
     for doc_id in doc_ids:
-        d = retriever.retrieve(doc_id) if collection_name != "bologna" else retriever_bologna.retrieve(doc_id)
+        d = (
+            retriever.retrieve(doc_id)
+            if collection_name != "bologna"
+            else retriever_bologna.retrieve(doc_id)
+        )
         # d = requests.get(
         #     "http://"
         #     + settings.host_base_url
@@ -430,7 +477,7 @@ async def query_elastic_index(
                                     },
                                     {"term": {"annotations.type": annotation["type"]}},
                                 ],
-                                 "minimum_should_match": 1
+                                "minimum_should_match": 1,
                             }
                         },
                     }
@@ -449,7 +496,7 @@ async def query_elastic_index(
                                     {"term": {"metadata.value": metadata["value"]}},
                                     {"term": {"metadata.type": metadata["type"]}},
                                 ],
-                                 "minimum_should_match": 1
+                                "minimum_should_match": 1,
                             }
                         },
                     }
@@ -541,7 +588,9 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
 
     # if not os.getenv("ENVIRONMENT", "production") == "dev":
-    model = SentenceTransformer("Alibaba-NLP/gte-multilingual-base", device="cuda", trust_remote_code=True)
+    model = SentenceTransformer(
+        "Alibaba-NLP/gte-multilingual-base", device="cuda", trust_remote_code=True
+    )
 
     model = model.to(environ.get("SENTENCE_TRANSFORMER_DEVICE", "cuda"))
     print("model on device", model.device)
@@ -550,7 +599,14 @@ if __name__ == "__main__":
     # Print each collection
     # for collection in collections:
     #     print(collection)
-    print("starting es client", settings.elastic_port)
+    print(
+        "starting es client",
+        {
+            "host": "localhost",
+            "scheme": "http",
+            "port": 9201,
+        },
+    )
     es_client = Elasticsearch(
         hosts=[
             {
@@ -563,7 +619,7 @@ if __name__ == "__main__":
     )
 
     DOCS_BASE_URL = "http://" + "documents" + ":" + "3001"
-    BOLOGNA_DOCS_BASE_URL = "http://" + "10.0.0.108" + ":" + "3002"
+    BOLOGNA_DOCS_BASE_URL = "http://" + "localhost" + ":" + "3002"
     print(DOCS_BASE_URL)
     retriever = DocumentRetriever(url=DOCS_BASE_URL + "/api/document")
     retriever_bologna = DocumentRetriever(url=BOLOGNA_DOCS_BASE_URL + "/api/document")
