@@ -131,7 +131,6 @@ def get_facets_metadata(search_res):
         final_bucket["n_children"] = len(children)
         metadata_facets.append(final_bucket)
     return metadata_facets
-    
 
 
 def anonymize(s):

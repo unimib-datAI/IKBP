@@ -508,55 +508,9 @@ async def query_elastic_index(
     search_res = es_client.search(
         index=index_name,
         size=20,
-        # source_excludes=["text"],
+        source_excludes=["chunks"],
         from_=from_offset,
         query=query,
-        # aggs={
-        #     "metadata": {
-        #         "nested": {"path": "metadata"},
-        #         "aggs": {
-        #             "types": {
-        #                 "terms": {"field": "metadata.type", "size": req.n_facets},
-        #                 "aggs": {
-        #                     "values": {
-        #                         "terms": {
-        #                             "field": "metadata.value",
-        #                             "size": req.n_facets,
-        #                             # "order": {"_key": "asc"},
-        #                         }
-        #                     }
-        #                 },
-        #             }
-        #         },
-        #     },
-        #     "annotations": {
-        #         "nested": {"path": "annotations"},
-        #         "aggs": {
-        #             "types": {
-        #                 "terms": {"field": "annotations.type", "size": req.n_facets},
-        #                 "aggs": {
-        #                     "mentions": {
-        #                         "terms": {
-        #                             "field": "annotations.id_ER",
-        #                             "size": req.n_facets,
-        #                         },
-        #                         "aggs": {
-        #                             "top_hits_per_mention": {
-        #                                 "top_hits": {
-        #                                     "_source": [
-        #                                         "annotations.display_name",
-        #                                         "annotations.is_linked",
-        #                                     ],
-        #                                     "size": 1,
-        #                                 }
-        #                             }
-        #                         },
-        #                     }
-        #                 },
-        #             }
-        #         },
-        #     },
-        # },
     )
 
     hits = get_hits(search_res)
