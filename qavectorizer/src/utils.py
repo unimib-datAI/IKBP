@@ -5,8 +5,11 @@ def get_hits(search_res):
     def convert_hit(hit):
         text = hit["_source"].pop("text")
         rest = {**hit["_source"]}
-        del rest["annotations"]
-        del rest["chunks"]
+        # if "annotations" in rest:
+        #     del  rest["annotations"]
+        # del rest["annotations"]
+        # if "chunks" in rest:
+        #     del  rest["chunks"]
         return {"_id": hit["_id"], "text": text[:150], **rest}
 
     return [convert_hit(hit) for hit in search_res["hits"]["hits"]]
@@ -44,7 +47,23 @@ def get_facets_annotations(search_res):
         for bucket in search_res["aggregations"]["annotations"]["types"]["buckets"]
     ]
 
-
+def group_facets(facets):
+    return_facets = []
+    for facets_group in facets:
+        grouped_facets = {}
+        for facet in facets_group['children']:
+            facet_display_name = facet['display_name'].lower()
+            if facet_display_name not in grouped_facets:
+                grouped_facets[facet_display_name] = facet
+                grouped_facets[facet_display_name]['ids_ER'] = [facet['key']]
+            else:
+                grouped_facets[facet_display_name]['doc_count'] += facet['doc_count']
+                grouped_facets[facet_display_name]['ids_ER'].append(facet['key'])
+        facets_group['children'] = [grouped_facets[key] for key in grouped_facets]
+    return facets
+    
+    
+    
 def get_facets_annotations_no_agg(hits):
     mentions_type_buckets = {}
     for document in hits["hits"]["hits"]:

@@ -14,6 +14,7 @@ from utils import (
     get_facets_metadata,
     get_hits,
     get_facets_annotations_no_agg,
+    group_facets
 )
 import torch
 from os import environ
@@ -501,7 +502,7 @@ async def query_elastic_index(
     hits = get_hits(search_res)
 
     annotations_facets = get_facets_annotations_no_agg(search_res)
-
+    annotations_facets = group_facets(annotations_facets)
     metadata_facets = get_facets_metadata(search_res)
     total_hits = search_res["hits"]["total"]["value"]
     num_pages = total_hits // req.documents_per_page
