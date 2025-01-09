@@ -213,22 +213,6 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
         print("response_full_text", response_full_text)
     del embeddings
 
-    # doc_chunk_ids_map = {}
-    # for hit in results["hits"]["hits"]:
-    #     doc_id = hit["_source"]["id"]
-    #     for chunk in hit["inner_hits"]["chunks.vectors"]["hits"]["hits"]:
-    #         chunk_text = chunk["fields"]["chunks"][0]["vectors"][0]["text"][0]
-    #         temp_chunk = {
-    #             "id": doc_id,
-    #             "distance": hit["_score"],
-    #             "text": chunk_text,
-    #             "metadata": {"doc_id": doc_id, "chunk_size": len(chunk_text)},
-    #         }
-
-    #         if doc_id in doc_chunk_ids_map:
-    #             doc_chunk_ids_map[doc_id].append(temp_chunk)
-    #         else:
-    #             doc_chunk_ids_map[doc_id] = [temp_chunk]
 
     def collect_chunk_ranks(response):
         ranks = {}
@@ -460,7 +444,9 @@ async def query_elastic_index(
             "must": [{"query_string": {"query": req.text, "default_field": "text"}}],
         },
     }
-
+    if req.text == "" or req.text == None or req.text == " ":
+        query["bool"]["must"] = [{"match_all": {}}]
+    # print("annotations", req.annotations)
     if req.annotations != None and len(req.annotations) > 0:
         for annotation in req.annotations:
             query["bool"]["must"].append(
@@ -469,7 +455,7 @@ async def query_elastic_index(
                         "path": "annotations",
                         "query": {
                             "bool": {
-                                "should": [
+                                "must": [
                                     {
                                         "term": {
                                             "annotations.id_ER": annotation["value"]
@@ -477,7 +463,6 @@ async def query_elastic_index(
                                     },
                                     {"term": {"annotations.type": annotation["type"]}},
                                 ],
-                                "minimum_should_match": 1,
                             }
                         },
                     }
@@ -492,19 +477,19 @@ async def query_elastic_index(
                         "path": "metadata",
                         "query": {
                             "bool": {
-                                "should": [
+                                "must": [
                                     {"term": {"metadata.value": metadata["value"]}},
                                     {"term": {"metadata.type": metadata["type"]}},
                                 ],
-                                "minimum_should_match": 1,
                             }
                         },
                     }
                 },
             )
     # get all docs if req.text is empty
-    if req.text == "" or req.text == None or req.text == " ":
-        query = {"match_all": {}}
+    # if (req.text == "" or req.text == None or req.text == " ") and (req.metadata == None or len(req.metadata) == 0) and (req.annotations == None or len(req.annotations) == 0):
+    
+    print("query", query)
     search_res = es_client.search(
         index=index_name,
         size=20,
@@ -524,7 +509,6 @@ async def query_elastic_index(
         total_hits % req.documents_per_page > 0
     ):  # if there is a remainder, add one more page
         num_pages += 1
-
     return {
         "hits": hits,
         "facets": {"annotations": annotations_facets, "metadata": metadata_facets},
@@ -573,7 +557,8 @@ if __name__ == "__main__":
     )
 
     DOCS_BASE_URL = "http://" + "documents" + ":" + "3001"
-    BOLOGNA_DOCS_BASE_URL = "http://" + "localhost" + ":" + "3002"
+    #for bologna  "http://" + "10.0.0.108" + ":" + "3002"
+    BOLOGNA_DOCS_BASE_URL = "http://" + "10.0.0.108" + ":" + "3002"
     print(DOCS_BASE_URL)
     retriever = DocumentRetriever(url=DOCS_BASE_URL + "/api/document")
     retriever_bologna = DocumentRetriever(url=BOLOGNA_DOCS_BASE_URL + "/api/document")
