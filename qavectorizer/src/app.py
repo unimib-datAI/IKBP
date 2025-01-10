@@ -443,6 +443,7 @@ async def query_elastic_index(
     query = {
         "bool": {
             "must": [{"query_string": {"query": req.text, "default_field": "text"}}],
+            "filter": {"bool": {"should": []}},
         },
     }
     if req.text == "" or req.text == None or req.text == " ":
@@ -450,7 +451,7 @@ async def query_elastic_index(
     # print("annotations", req.annotations)
     if req.annotations != None and len(req.annotations) > 0:
         for annotation in req.annotations:
-            query["bool"]["must"].append(
+            query["bool"]['filter']['bool']["should"].append(
                 {
                     "nested": {
                         "path": "annotations",
@@ -472,7 +473,7 @@ async def query_elastic_index(
 
     if req.metadata != None and len(req.metadata) > 0:
         for metadata in req.metadata:
-            query["bool"]["must"].append(
+            query["bool"]['filter']['bool']["should"].append(
                 {
                     "nested": {
                         "path": "metadata",
@@ -490,7 +491,6 @@ async def query_elastic_index(
     # get all docs if req.text is empty
     # if (req.text == "" or req.text == None or req.text == " ") and (req.metadata == None or len(req.metadata) == 0) and (req.annotations == None or len(req.annotations) == 0):
     
-    print("query", query)
     search_res = es_client.search(
         index=index_name,
         size=20,
@@ -505,6 +505,8 @@ async def query_elastic_index(
     annotations_facets = group_facets(annotations_facets)
     metadata_facets = get_facets_metadata(search_res)
     total_hits = search_res["hits"]["total"]["value"]
+    print("total_hits", total_hits)
+    print("query", query)
     num_pages = total_hits // req.documents_per_page
     if (
         total_hits % req.documents_per_page > 0
