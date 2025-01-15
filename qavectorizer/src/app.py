@@ -14,7 +14,9 @@ from utils import (
     get_facets_metadata,
     get_hits,
     get_facets_annotations_no_agg,
-    group_facets
+    group_facets,
+    collect_chunk_ranks,
+    collect_chunk_ranks_full_text,
 )
 import torch
 from os import environ
@@ -110,14 +112,53 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
         # excludes ner entities search if specified in retrieval method
         should_query = (
             [
-                {"match": {"chunks.vectors.text": req.query}},
+                {
+                    "match": {
+                        "chunks.vectors.text": req.query,
+                    }
+                },
             ]
             if req.retrievalMethod == "hibrid_no_ner"
             else [
                 {"match": {"chunks.vectors.text": req.query}},
-                {"match": {"chunks.vectors.entities": req.query}},
+                {
+                    "match": {
+                        "chunks.vectors.entities": req.query,
+                    }
+                },
             ]
         )
+        q = {
+            "_source": True,
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"terms": {"id": [doc_id for doc_id in req.filter_ids]}}
+                    ],
+                    "must": [
+                        {
+                            "nested": {
+                                "path": "chunks",
+                                "query": {
+                                    "nested": {
+                                        "path": "chunks.vectors",
+                                        "query": {
+                                            "bool": {
+                                                "should": should_query,
+                                            }
+                                        },
+                                    }
+                                },
+                                "inner_hits": {
+                                    "_source": False,
+                                    "fields": ["chunks.vectors.text", "_score"],
+                                },
+                            }
+                        }
+                    ],
+                },
+            },
+        }
         query_full_text = {
             "_source": ["id"],
             "query": {
@@ -164,10 +205,55 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
             ]
             if req.retrievalMethod == "hibrid_no_ner"
             else [
-                {"match": {"chunks.vectors.text": req.query}},
-                {"match": {"chunks.vectors.entities": req.query}},
+                {
+                    "match": {
+                        "chunks.vectors.text": req.query,
+                    }
+                },
+                {
+                    "match": {
+                        "chunks.vectors.entities": req.query,
+                    }
+                },
             ]
         )
+        q = {
+            "_source": True,
+            "query": {
+                "bool": {
+                    # "filter": [
+                    #     {
+                    #         "terms": {
+                    #             "id": [
+                    #                 "e45a49ff92fe4c11a9455a66b5c8ced89b3d4e844db9b8c05bfd738524a40bcb"
+                    #             ]
+                    #         }
+                    #     }
+                    # ],
+                    "must": [
+                        {
+                            "nested": {
+                                "path": "chunks",
+                                "query": {
+                                    "nested": {
+                                        "path": "chunks.vectors",
+                                        "query": {
+                                            "bool": {
+                                                "should": should_query,
+                                            }
+                                        },
+                                    }
+                                },
+                                "inner_hits": {
+                                    "_source": False,
+                                    "fields": ["chunks.vectors.text", "_score"],
+                                },
+                            }
+                        }
+                    ],
+                },
+            },
+        }
         query_full_text = {
             "_source": ["id"],
             "query": {
@@ -200,7 +286,7 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
 
     # debug print statement for checking correct retrieval mode
     response_full_text = (
-        es_client.search(index=collection_name, body=query_full_text)
+        es_client.search(index=collection_name, body=q)
         if req.retrievalMethod == "full"
         or req.retrievalMethod == "hibrid_no_ner"
         or req.retrievalMethod == "full-text"
@@ -213,24 +299,16 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
     ):
         print("response_full_text", response_full_text)
     del embeddings
-
-
-    def collect_chunk_ranks(response):
-        ranks = {}
-        for rank, hit in enumerate(response["hits"]["hits"]):
-            doc_id = hit["_source"]["id"]
-            if "inner_hits" in hit and "chunks.vectors" in hit["inner_hits"]:
-                for chunk_hit in hit["inner_hits"]["chunks.vectors"]["hits"]["hits"]:
-                    chunk_id = chunk_hit["fields"]["chunks"][0]["vectors"][0]["text"][0]
-                    combined_id = (doc_id, chunk_id)
-                    ranks[combined_id] = rank + 1  # Avoid division by zero
-        return ranks
+    print("query", q)
 
     # Get chunk-level ranks for both searches
     vector_ranks = collect_chunk_ranks(results) if len(results) > 0 else {}
     full_text_ranks = (
-        collect_chunk_ranks(response_full_text) if len(response_full_text) > 0 else {}
+        collect_chunk_ranks_full_text(response_full_text)
+        if len(response_full_text) > 0
+        else {}
     )
+    print("FT Ranks", full_text_ranks, len(response_full_text))
 
     # RRF Parameters
     rrf_k = 60  # Adjust as needed
@@ -248,7 +326,7 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
 
     # Sort chunks by combined RRF scores
     final_ranking = sorted(combined_scores.items(), key=lambda x: x[1], reverse=True)
-
+    print("final_ranking", final_ranking)
     # for rank, (doc_id, score) in enumerate(final_ranking[:20], start=1):
     #     print(f"Rank: {rank}, Doc ID: {doc_id}, RRF Score: {score}")
 
@@ -437,7 +515,6 @@ async def query_elastic_index(
     index_name: str,
     req: QueryElasticIndexRequest,
 ):
-    print("received request", req.dict())
     from_offset = (req.page - 1) * req.documents_per_page
 
     query = {
@@ -451,7 +528,7 @@ async def query_elastic_index(
     # print("annotations", req.annotations)
     if req.annotations != None and len(req.annotations) > 0:
         for annotation in req.annotations:
-            query["bool"]['filter']['bool']["should"].append(
+            query["bool"]["filter"]["bool"]["should"].append(
                 {
                     "nested": {
                         "path": "annotations",
@@ -473,7 +550,7 @@ async def query_elastic_index(
 
     if req.metadata != None and len(req.metadata) > 0:
         for metadata in req.metadata:
-            query["bool"]['filter']['bool']["should"].append(
+            query["bool"]["filter"]["bool"]["should"].append(
                 {
                     "nested": {
                         "path": "metadata",
@@ -490,7 +567,7 @@ async def query_elastic_index(
             )
     # get all docs if req.text is empty
     # if (req.text == "" or req.text == None or req.text == " ") and (req.metadata == None or len(req.metadata) == 0) and (req.annotations == None or len(req.annotations) == 0):
-    
+
     search_res = es_client.search(
         index=index_name,
         size=20,
@@ -505,8 +582,7 @@ async def query_elastic_index(
     annotations_facets = group_facets(annotations_facets)
     metadata_facets = get_facets_metadata(search_res)
     total_hits = search_res["hits"]["total"]["value"]
-    print("total_hits", total_hits)
-    print("query", query)
+
     num_pages = total_hits // req.documents_per_page
     if (
         total_hits % req.documents_per_page > 0
@@ -560,7 +636,7 @@ if __name__ == "__main__":
     )
 
     DOCS_BASE_URL = "http://" + "documents" + ":" + "3001"
-    #for bologna  "http://" + "10.0.0.108" + ":" + "3002"
+    # for bologna  "http://" + "10.0.0.108" + ":" + "3002"
     BOLOGNA_DOCS_BASE_URL = "http://" + "10.0.0.108" + ":" + "3002"
     print(DOCS_BASE_URL)
     retriever = DocumentRetriever(url=DOCS_BASE_URL + "/api/document")

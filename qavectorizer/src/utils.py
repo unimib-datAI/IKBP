@@ -47,23 +47,51 @@ def get_facets_annotations(search_res):
         for bucket in search_res["aggregations"]["annotations"]["types"]["buckets"]
     ]
 
+
 def group_facets(facets):
     return_facets = []
     for facets_group in facets:
         grouped_facets = {}
-        for facet in facets_group['children']:
-            facet_display_name = facet['display_name'].lower()
+        for facet in facets_group["children"]:
+            facet_display_name = facet["display_name"].lower()
             if facet_display_name not in grouped_facets:
                 grouped_facets[facet_display_name] = facet
-                grouped_facets[facet_display_name]['ids_ER'] = [facet['key']]
+                grouped_facets[facet_display_name]["ids_ER"] = [facet["key"]]
             else:
-                grouped_facets[facet_display_name]['doc_count'] += facet['doc_count']
-                grouped_facets[facet_display_name]['ids_ER'].append(facet['key'])
-        facets_group['children'] = [grouped_facets[key] for key in grouped_facets]
+                grouped_facets[facet_display_name]["doc_count"] += facet["doc_count"]
+                grouped_facets[facet_display_name]["ids_ER"].append(facet["key"])
+        facets_group["children"] = [grouped_facets[key] for key in grouped_facets]
     return facets
-    
-    
-    
+
+
+def collect_chunk_ranks(response):
+    ranks = {}
+    temp_rank = 1
+    for rank, hit in enumerate(response["hits"]["hits"]):
+        doc_id = hit["_source"]["id"]
+        if "inner_hits" in hit and "chunks.vectors" in hit["inner_hits"]:
+            for chunk_hit in hit["inner_hits"]["chunks.vectors"]["hits"]["hits"]:
+                chunk_id = chunk_hit["fields"]["chunks"][0]["vectors"][0]["text"][0]
+                combined_id = (doc_id, chunk_id)
+                ranks[combined_id] = temp_rank  # Avoid division by zero
+                temp_rank += 1
+    return ranks
+
+
+def collect_chunk_ranks_full_text(response):
+    ranks = {}
+    temp_rank = 1
+    for rank, hit in enumerate(response["hits"]["hits"]):
+        doc_id = hit["_source"]["id"]
+        if "inner_hits" in hit and "chunks" in hit["inner_hits"]:
+            for chunk_hit in hit["inner_hits"]["chunks"]["hits"]["hits"]:
+                chunk_id = chunk_hit["fields"]["chunks"][0]["vectors"][0]["text"][0]
+                combined_id = (doc_id, chunk_id)
+                ranks[combined_id] = temp_rank  # Avoid division by zero
+                temp_rank += 1
+    return ranks
+
+
 def get_facets_annotations_no_agg(hits):
     mentions_type_buckets = {}
     for document in hits["hits"]["hits"]:
