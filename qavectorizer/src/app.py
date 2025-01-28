@@ -606,9 +606,12 @@ if __name__ == "__main__":
 
     # if not os.getenv("ENVIRONMENT", "production") == "dev":
     model = SentenceTransformer(
-        "Alibaba-NLP/gte-multilingual-base", device="cuda", trust_remote_code=True
+        environ.get(
+            "SENTENCE_TRANSFORMER_EMBEDDING_MODEL", "Alibaba-NLP/gte-multilingual-base"
+        ),
+        device="cuda",
+        trust_remote_code=True,
     )
-
     model = model.to(environ.get("SENTENCE_TRANSFORMER_DEVICE", "cuda"))
     print("model on device", model.device)
     model = model.eval()
