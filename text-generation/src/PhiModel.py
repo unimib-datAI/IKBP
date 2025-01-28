@@ -15,7 +15,7 @@ class PhiModel:
                 repo_id="QuantFactory/Phi-3.5-mini-ITA-GGUF",
                 filename="Phi-3.5-mini-ITA.Q8_0.gguf",
             ),
-            n_ctx=8192,
+            n_ctx=20000,
             n_gpu_layers=n_gpu_layers,
         )
 
@@ -45,7 +45,6 @@ class PhiModel:
         token_repetition_penalty_sustain: int,
         token_repetition_penalty_decay: int,
     ):
-        print("stream", inputs)
         max_new_tokens = min(max_new_tokens, 4096)
         try:
             stream = self.llm(
@@ -56,19 +55,25 @@ class PhiModel:
                 top_p=top_p,
                 repeat_penalty=token_repetition_penalty_max,
                 min_p=min_p,
-                stop=["[|Assistente|]", "[/USER]", "[/INST]", "[INST]", "[|Umano|]", "[/INST]"],
+                stop=[
+                    "[|Assistente|]",
+                    "[/USER]",
+                    "[/INST]",
+                    "[INST]",
+                    "[|Umano|]",
+                    "[/INST]",
+                ],
                 stream=True,
             )
             for output in stream:
-                print(output["choices"][0]["text"])
                 yield output["choices"][0]["text"]
                 await asyncio.sleep(0.01)
                 # stop if the output is empty
                 if not output:
                     break
         except Exception as e:
-            print(e)
-            yield "Error"
+            print("Error during text generation: ", e)
+            yield f"Error {str(e)}"
 
     def generate(self, inputs, max_new_tokens):
         # No streaming, using generate_simple:
