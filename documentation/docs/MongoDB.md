@@ -5,7 +5,8 @@ sidebar_position: 2
 # MongoDB
 
 This page contains all informations needed to start **MongoDB instance**. <br />
-Mongo will run by default on port **27017**.
+Mongo will run by default on port **27017**.<br />
+MongoDB is used to store all annotated documents.
 
 ## Docker compose
 
