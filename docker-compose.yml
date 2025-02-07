@@ -283,9 +283,104 @@ services:
       - GPU_LAYERS=${TEXT_GENERATION_GPU_LAYERS}
     ports:
       - 10.0.0.108:7862:7862
+      - 8000:8000
     volumes:
       - ./models/text-generation:/workspace/models
+      - /mnt/data:/models
       # - ./text-generation/src:/workspace
+  lmstudio:
+    build: .
+    container_name: lmstudio
+    ports:
+      - "1234:1234"
+      - "5900:5900"
+    volumes:
+      - /mnt/data/models:/root/.cache/lm-studio/models
+    environment:
+      - CONTEXT_LENGTH=32768
+      - MODEL_PATH=bartowski/Codestral-22B-v0.1-GGUF/Codestral-22B-v0.1-Q8_0.gguf
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    command: ["/start_services.sh"]
+    restart: always
+  openllm:
+    image: openllm/openllm:latest
+    environment:
+      - MODEL_PATH=/mnt/data/models/Phi-3.5-mini-ITA.Q8_0.gguf
+      - QUANTIZE=ggml
+      - DEVICE=cuda
+    ports:
+      - "3000:3000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]
+              capabilities: [gpu]
+
+  # llama_server:
+  #   restart: $RESTART_POLICY
+  #   build:
+  #     context: ./llama_server
+  #     dockerfile: Dockerfile
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+  #   environment:
+  #     - MODEL_PATH=/models/llama-2-7b.gguf
+  #     - SERVER_PORT=8080
+  #     - GPU_LAYERS=35
+  #     - THREADS=8
+  #     - BATCH_SIZE=512
+  #   volumes:
+  #     - ./models:/models
+  #   networks:
+  #     - caddy_net
+  #   ports:
+  #     - 8080:8080
+  llama_server:
+    image: dongxiaoman/llama.cpp-server:cuda-latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./models:/models
+    environment:
+      - MODEL_PATH=/models/your_model_file
+      - CUDA_VISIBLE_DEVICES=0 # Adjust based on your GPU
+    command: >
+      -m /models/your_model_file
+      --port 8080
+      --host 0.0.0.0
+      --n_gpu_layers 32  # Adjust based on your GPU memory
+  # llamacpp-server:
+  #   image: ghcr.io/ggerganov/llama.cpp:server-cuda
+  #   ports:
+  #     - 8080:8080
+  #   volumes:
+  #     - ./models:/models
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+  #   environment:
+  #     # alternatively, you can use "LLAMA_ARG_MODEL_URL" to download the model
+  #     LLAMA_ARG_MODEL: /models/Phi-3.5-mini-ITA.Q8_0.gguf
+  #     # LLAMA_ARG_CTX_SIZE: 4096
+  #     LLAMA_ARG_N_PARALLEL: 2
+  #     LLAMA_ARG_ENDPOINT_METRICS: 1
+  #     LLAMA_ARG_PORT: 8080
+  #     LLAMA_ARG_SPLIT_MODE: none
 
   es:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.3

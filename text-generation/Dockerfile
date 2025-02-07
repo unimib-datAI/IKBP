@@ -1,25 +1,34 @@
 ARG CUDA_IMAGE="12.2.2-devel-ubuntu22.04"
 FROM nvidia/cuda:${CUDA_IMAGE}
 
-# We need to set the host to 0.0.0.0 to allow outside access
+# Set the host to 0.0.0.0 for external access
 ENV HOST 0.0.0.0
 
 RUN apt-get update && apt-get upgrade -y \
     && apt-get install -y git build-essential \
-    python3 python3-pip gcc wget \
+    python3 python3-pip gcc wget unzip \
     ocl-icd-opencl-dev opencl-headers clinfo \
     libclblast-dev libopenblas-dev \
     && mkdir -p /etc/OpenCL/vendors && echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
 
-# setting build related env vars
+# Set build-related env vars
 ENV CUDA_DOCKER_ARCH=all
 ENV LLAMA_CUBLAS=1
 
-# Install depencencies
+# Install dependencies
 RUN python3 -m pip install --upgrade pip pytest cmake scikit-build setuptools fastapi uvicorn sse-starlette pydantic-settings starlette-context
 
-# Install llama-cpp-python (build with cuda)
-RUN CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python
+# Download the latest llama.cpp release binaries
+WORKDIR /workspace
+# RUN wget -qO- https://api.github.com/repos/ggerganov/llama.cpp/releases/latest | \
+#     grep "browser_download_url.*llama.*linux-x86_64" | \
+#     cut -d '"' -f 4 | wget -i - -O llama.cpp.tar.gz && \
+#     tar -xzf llama.cpp.tar.gz && \
+#     rm llama.cpp.tar.gz && \
+#     chmod +x ./llama.cpp
+
+# Install llama-cpp-python (build with CUDA)
+RUN CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python 'llama-cpp-python[server]'
 
 WORKDIR /workspace
 
@@ -28,5 +37,5 @@ COPY ./requirements.txt ./src .
 RUN pip install --no-cache-dir -r ./requirements.txt
 
 EXPOSE 7862
-
-CMD python3 app.py -d ./models/${MODEL_NAME} -gl "${GPU_LAYERS}"
+CMD python3 -m llama_cpp.server --model /models/Phi.gguf
+# CMD python3 app.py -d ./models/${MODEL_NAME} -gl "${GPU_LAYERS}"
