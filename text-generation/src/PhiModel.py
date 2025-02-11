@@ -10,14 +10,15 @@ import asyncio
 class PhiModel:
     def __init__(self, n_gpu_layers=-1):
 
-        self.llm = Llama(
-            model_path=hf_hub_download(
-                repo_id="QuantFactory/Phi-3.5-mini-ITA-GGUF",
-                filename="Phi-3.5-mini-ITA.Q8_0.gguf",
-            ),
-            n_ctx=20000,
-            n_gpu_layers=n_gpu_layers,
-        )
+        # self.llm = Llama(
+        #     model_path=hf_hub_download(
+        #         repo_id="QuantFactory/Phi-3.5-mini-ITA-GGUF",
+        #         filename="Phi-3.5-mini-ITA.Q8_0.gguf",
+        #     ),
+        #     n_ctx=20000,
+        #     n_gpu_layers=n_gpu_layers,
+        # )
+        self.llm = None
 
     def tokenize(self, inputs: str):
         return self.tokenizer.encode(inputs)

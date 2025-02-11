@@ -28,7 +28,9 @@ WORKDIR /workspace
 #     chmod +x ./llama.cpp
 
 # Install llama-cpp-python (build with CUDA)
-RUN CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python 'llama-cpp-python[server]'
+# DCMAKE_CUDA_ARCHITECTURES=75 for Tesla T4
+ENV CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=75" 
+RUN pip install llama-cpp-python 'llama-cpp-python[server]' langchain openai langchain_community langchain-openai
 
 WORKDIR /workspace
 
@@ -37,5 +39,7 @@ COPY ./requirements.txt ./src .
 RUN pip install --no-cache-dir -r ./requirements.txt
 
 EXPOSE 7862
-CMD python3 -m llama_cpp.server --model /models/Phi.gguf
+ENTRYPOINT ["./entrypoint.sh"]
+
+# CMD python3 -m llama_cpp.server --model /models/Phi.gguf --chat_format chatml --n_gpu_layers 35
 # CMD python3 app.py -d ./models/${MODEL_NAME} -gl "${GPU_LAYERS}"

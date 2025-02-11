@@ -347,13 +347,13 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
 
     # get full documents from db
     doc_ids = list(doc_chunks_id_map.keys())
-
+    current_retriever = retriever
+    if collection_name == "bologna":
+        current_retriever = retriever_bologna
+    elif collection_name == "sperimentazione":
+        current_retriever = retriever_sperimentazione
     for doc_id in doc_ids:
-        d = (
-            retriever.retrieve(doc_id)
-            if collection_name != "bologna"
-            else retriever_bologna.retrieve(doc_id)
-        )
+        d = current_retriever.retrieve(doc_id)
         # d = requests.get(
         #     "http://"
         #     + settings.host_base_url
@@ -366,7 +366,24 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
 
     doc_results = []
     print(doc_chunks_id_map.keys())
+    if len(req.filter_ids) == 1:
+        temp_chunk = {
+            "id": full_docs[0]["id"],
+            "text": full_docs[0]["text"],
+            "metadata": {
+                "doc_id": full_docs[0]["id"],
+                "chunk_size": len(full_docs[0]["text"]),
+            },
+        }
+        doc_results.append(
+            {
+                "doc": full_docs[0],
+                "chunks": [temp_chunk],
+            }
+        )
+        return doc_results
     for doc in full_docs:
+        print(doc.keys())
         doc_results.append({"doc": doc, "chunks": doc_chunks_id_map[doc["id"]]})
 
     return doc_results
@@ -641,9 +658,13 @@ if __name__ == "__main__":
     DOCS_BASE_URL = "http://" + "documents" + ":" + "3001"
     # for bologna  "http://" + "10.0.0.108" + ":" + "3002"
     BOLOGNA_DOCS_BASE_URL = "http://" + "10.0.0.108" + ":" + "3002"
+    SPERIMENTAZIONE_DOCS_BASE_URL = "http://" + "10.0.0.108" + ":" + "3003"
     print(DOCS_BASE_URL)
     retriever = DocumentRetriever(url=DOCS_BASE_URL + "/api/document")
     retriever_bologna = DocumentRetriever(url=BOLOGNA_DOCS_BASE_URL + "/api/document")
+    retriever_sperimentazione = DocumentRetriever(
+        url=SPERIMENTAZIONE_DOCS_BASE_URL + "/api/document"
+    )
     # if not os.getenv("ENVIRONMENT", "production") == "dev":
     #     with open(environ.get("OGG2NAME_INDEX"), "r") as fd:
     #         ogg2name_index = json.load(fd)

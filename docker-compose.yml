@@ -53,6 +53,19 @@ services:
       - ./documents/src:/app/src
     ports:
       - 3002:3001
+  documents_sperimentazione:
+    restart: $RESTART_POLICY
+    build: documents
+    environment:
+      DOCS_PORT: 3001
+      ENABLE_AUTH: false
+      MONGO: $MONGO_SPERIMENTAZIONE
+    networks:
+      - caddy_net
+    volumes:
+      - ./documents/src:/app/src
+    ports:
+      - 3003:3001
 
   indexer:
     restart: $RESTART_POLICY
@@ -213,6 +226,56 @@ services:
       - ./giustizia-ui/package.json:/app/package.json
     # command: sleep 7200
 
+  ui_sperimentazione:
+    restart: $RESTART_POLICY
+    build:
+      context: giustizia-ui
+      args:
+        ACCESS_USERNAME: $UI_DEMO_ACCESS_USERNAME
+        ACCESS_PASSWORD: $UI_DEMO_ACCESS_PASSWORD
+        API_BASE_URI: ${SPERIMENTAZIONE_PIPELINE_ADDRESS}/api
+        API_USERNAME: ""
+        API_PASSWORD: ""
+        NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
+        NEXTAUTH_URL: $SPERIMENTAZIONE_UI_NEXTAUTH_URL
+        NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
+        NEXT_PUBLIC_FULL_PATH: $SPERIMENTAZIONE_UI_NEXT_PUBLIC_FULL_PATH
+        API_LLM: $UI_API_LLM
+        API_INDEXER: $UI_API_INDEXER
+        VARIANT: "sperimentazione"
+        TEXT_GENERATION: $TEXT_GENERATION_ADDR
+        ELASTIC_INDEX: "sperimentazione"
+    ports:
+      - $SPERIMENTAZIONE_LISTEN_UI:3000
+      # - 127.0.0.1:9229:9229
+    environment:
+      ACCESS_USERNAME: $UI_DEMO_ACCESS_USERNAME
+      ACCESS_PASSWORD: $UI_DEMO_ACCESS_PASSWORD
+      API_BASE_URI: ${SPERIMENTAZIONE_PIPELINE_ADDRESS}/api
+      API_USERNAME: ""
+      API_PASSWORD: ""
+      NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
+      NEXTAUTH_URL: $DEMO_UI_NEXTAUTH_URL
+      NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
+      NEXT_PUBLIC_FULL_PATH: $DEMO_UI_NEXT_PUBLIC_FULL_PATH
+      API_LLM: $UI_API_LLM
+      API_INDEXER: $UI_API_INDEXER
+      VARIANT: "bologna"
+      TEXT_GENERATION: $TEXT_GENERATION_ADDR
+      HOST: host.docker.internal
+      ELASTIC_INDEX: "sperimentazione"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    volumes:
+      - ./giustizia-ui/modules:/app/modules
+      - ./giustizia-ui/server:/app/server
+      - ./giustizia-ui/pages:/app/pages
+      - ./giustizia-ui/components:/app/components
+      - ./giustizia-ui/lib:/app/lib
+      - ./giustizia-ui/package.json:/app/package.json
+    # command: sleep 7200
+
   ui:
     restart: $RESTART_POLICY
     build:
@@ -231,6 +294,7 @@ services:
         API_INDEXER: $UI_API_INDEXER
         VARIANT: $UI_VARIANT
         TEXT_GENERATION: $TEXT_GENERATION_ADDR
+        ELASTIC_INDEX: "batini"
     ports:
       - $LISTEN_UI:3000
       - 127.0.0.1:9229:9229
@@ -249,6 +313,7 @@ services:
       VARIANT: $UI_VARIANT
       TEXT_GENERATION: $TEXT_GENERATION_ADDR
       HOST: host.docker.internal
+      ELASTIC_INDEX: "batini"
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
