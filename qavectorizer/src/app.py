@@ -5,6 +5,7 @@ from typing import List
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, Depends
 import uuid
+from transformers import AutoTokenizer
 from sentence_transformers import SentenceTransformer
 from functools import lru_cache
 from settings import AppSettings
@@ -24,6 +25,7 @@ import json
 import os
 import logging
 from fastapi.responses import JSONResponse
+import requests
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -299,7 +301,8 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
     ):
         print("response_full_text", response_full_text)
     del embeddings
-    print("query", q)
+    print("query", query_body)
+    print("text query", q)
 
     # Get chunk-level ranks for both searches
     vector_ranks = collect_chunk_ranks(results) if len(results) > 0 else {}
@@ -348,10 +351,16 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
     # get full documents from db
     doc_ids = list(doc_chunks_id_map.keys())
     current_retriever = retriever
-    if collection_name == "bologna":
+    if collection_name == "bologna_clean_renzo":
         current_retriever = retriever_bologna
     elif collection_name == "sperimentazione":
         current_retriever = retriever_sperimentazione
+    elif collection_name == "indagini":
+        current_retriever = retriever_indagini
+    elif collection_name == "mirko":
+        current_retriever = retriever_mirko
+    elif collection_name == "doc_eng":
+        current_retriever = retriever_renzo
     for doc_id in doc_ids:
         d = current_retriever.retrieve(doc_id)
         # d = requests.get(
@@ -362,27 +371,75 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
         #     + "/api/mongo/document/"
         #     + str(doc_id)
         # ).json()
+        if "error" in d:
+            print("Error retrieving document", d["error"])
+            continue
         full_docs.append(d)
 
     doc_results = []
     print(doc_chunks_id_map.keys())
+    full_docs_keywords = [
+        "estrai",
+        "riassumi",
+    ]
+
+    full_docs_flag = (
+        True
+        if any(keyword in req.query.lower() for keyword in full_docs_keywords)
+        else False
+    )
     if len(req.filter_ids) == 1:
-        temp_chunk = {
-            "id": full_docs[0]["id"],
-            "text": full_docs[0]["text"],
-            "metadata": {
-                "doc_id": full_docs[0]["id"],
-                "chunk_size": len(full_docs[0]["text"]),
-            },
-        }
-        doc_results.append(
-            {
-                "doc": full_docs[0],
-                "chunks": [temp_chunk],
+        tokens = tokenizer.tokenize(full_docs[0]["text"])
+
+        print(f"Number of tokens: {len(tokens)}")
+        if len(tokens) < 18000:
+
+            temp_chunk = {
+                "id": full_docs[0]["id"],
+                "text": full_docs[0]["text"],
+                "metadata": {
+                    "doc_id": full_docs[0]["id"],
+                    "chunk_size": len(full_docs[0]["text"]),
+                },
             }
-        )
-        return doc_results
+            doc_results.append(
+                {
+                    "doc": full_docs[0],
+                    "chunks": [temp_chunk],
+                }
+            )
+            return doc_results
+    if full_docs_flag:
+        token_count = 0
+        for doc in full_docs:
+            tokens = tokenizer.tokenize(doc["text"])
+            token_count += len(tokens)
+        if token_count <= 18000:
+            for doc in full_docs:
+                temp_chunk = {
+                    "id": doc["id"],
+                    "text": doc["text"],
+                    "metadata": {
+                        "doc_id": doc["id"],
+                        "chunk_size": len(doc["text"]),
+                    },
+                }
+                doc_results.append(
+                    {
+                        "doc": doc,
+                        "chunks": [temp_chunk],
+                    }
+                )
+            return doc_results
+        else:
+            for doc in full_docs:
+                print(doc)
+                print(doc.keys())
+                doc_results.append({"doc": doc, "chunks": doc_chunks_id_map[doc["id"]]})
+            return doc_results
+
     for doc in full_docs:
+        print(doc)
         print(doc.keys())
         doc_results.append({"doc": doc, "chunks": doc_chunks_id_map[doc["id"]]})
 
@@ -632,6 +689,7 @@ if __name__ == "__main__":
     model = model.to(environ.get("SENTENCE_TRANSFORMER_DEVICE", "cuda"))
     print("model on device", model.device)
     model = model.eval()
+    tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3.5-mini-instruct")
 
     # Print each collection
     # for collection in collections:
@@ -653,18 +711,28 @@ if __name__ == "__main__":
             }
         ],
         request_timeout=60,
+        # headers={
+        #     "accept": "application/vnd.elasticsearch+json; compatible-with=8",
+        #     "content_type": "application/vnd.elasticsearch+json; compatible-with=8",
+        # },
     )
 
     DOCS_BASE_URL = "http://" + "documents" + ":" + "3001"
     # for bologna  "http://" + "10.0.0.108" + ":" + "3002"
     BOLOGNA_DOCS_BASE_URL = "http://" + "10.0.0.108" + ":" + "3002"
     SPERIMENTAZIONE_DOCS_BASE_URL = "http://" + "10.0.0.108" + ":" + "3003"
+    INDAGINI_DOCS_BASE_URL = "http://" + "10.0.0.108" + ":" + "3004"
+    MIRKO_DOCS_BASE_URL = "http://" + "10.0.0.108" + ":" + "3005"
+    RENZO_DOCS_BASE_URL = "http://" + "10.0.0.108" + ":" + "3006"
     print(DOCS_BASE_URL)
     retriever = DocumentRetriever(url=DOCS_BASE_URL + "/api/document")
     retriever_bologna = DocumentRetriever(url=BOLOGNA_DOCS_BASE_URL + "/api/document")
     retriever_sperimentazione = DocumentRetriever(
         url=SPERIMENTAZIONE_DOCS_BASE_URL + "/api/document"
     )
+    retriever_indagini = DocumentRetriever(url=INDAGINI_DOCS_BASE_URL + "/api/document")
+    retriever_mirko = DocumentRetriever(url=MIRKO_DOCS_BASE_URL + "/api/document")
+    retriever_renzo = DocumentRetriever(url=RENZO_DOCS_BASE_URL + "/api/document")
     # if not os.getenv("ENVIRONMENT", "production") == "dev":
     #     with open(environ.get("OGG2NAME_INDEX"), "r") as fd:
     #         ogg2name_index = json.load(fd)

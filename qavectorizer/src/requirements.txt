@@ -2,5 +2,5 @@ fastapi
 uvicorn
 sentence-transformers
 tqdm
-elasticsearch
+elasticsearch==8.9.0
 pydantic-settings

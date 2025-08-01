@@ -95,6 +95,8 @@ def collect_chunk_ranks_full_text(response):
 def get_facets_annotations_no_agg(hits):
     mentions_type_buckets = {}
     for document in hits["hits"]["hits"]:
+        if "annotations" not in document["_source"]:
+            continue
         for mention in document["_source"]["annotations"]:
             if mention["type"] not in mentions_type_buckets:
                 mentions_type_buckets[mention["type"]] = []
