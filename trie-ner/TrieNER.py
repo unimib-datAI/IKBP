@@ -10,6 +10,9 @@ import re
 import string
 
 class TrieNER:
+    def init_stopwords(self, stopwords):
+        self.stopwords = set(stopwords)
+
     def __init__(self, path = None):
         # trie structure holding the patterns to find
         self.trie = None
@@ -34,7 +37,10 @@ class TrieNER:
         result = []
         for i in range(1, len(items) + 1):
             for comb in itertools.permutations(items, i):
-                result.append(' '.join(comb))
+                to_append = ' '.join(comb)
+                if len(to_append) > 1:
+                    # avoid adding single letter patterns: too confusing
+                    result.append(to_append)
         return result
     
     def __add_entity(self, key, entity_type, entity_id):
@@ -179,6 +185,12 @@ class TrieNER:
                 
                 annotation = self.__create_annotation(ann_id + 1, start, end, pattern)
                 
+                pattern_no_punct = pattern
+                pattern_no_punct.translate(str.maketrans('', '', string.punctuation))
+                if pattern_no_punct in self.stopwords:
+                    # skip
+                    continue
+
                 if len(annotations) == 0:
                     annotations.append(annotation)
                     ann_id += 1

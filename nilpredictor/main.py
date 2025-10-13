@@ -36,6 +36,7 @@ class Features(BaseModel):
     candidateIndexer: Optional[int]
     # stats
     topcandidates: Optional[List[Candidate]]
+    secondiff: Optional[float]
 
 app = FastAPI()
 
@@ -43,9 +44,8 @@ app = FastAPI()
 async def nilprediction_doc_api(doc: dict = Body(...)):
     doc = Document.from_dict(doc)
 
-    annsets_to_link = set([doc.features.get('annsets_to_link', 'entities_merged')])
-
-    input = []
+    annsets_to_link = set([doc.features.get('annsets_to_link', 'entities_')])
+    input_args = []
     mentions = []
 
     for annset_name in set(doc.annset_names()).intersection(annsets_to_link):
@@ -71,11 +71,12 @@ async def nilprediction_doc_api(doc: dict = Body(...)):
                                                         else doc.text[mention.start:mention.end]
             feat.title = gt_features['title'] if 'title' in gt_features else None
 
-            input.append(feat)
+            feat.topcandidates = [Candidate(**c) for c in mention.features['additional_candidates']]
+
+            input_args.append(feat)
             mentions.append(mention)
 
-    nil_results = run(input)
-
+    nil_results = run(input_args)
     score_label = 'nil_score_cross' if 'nil_score_cross' in nil_results else 'nil_score_bi'
     add_score_bi = 'nil_score_cross' in nil_results
 
@@ -105,10 +106,10 @@ async def nilprediction_doc_api(doc: dict = Body(...)):
 async def nilprediction_api(input: List[Features]):
     return run(input)
 
-def run(input: List[Features]):
+def run(input_data: List[Features]):
     nil_X = pd.DataFrame()
 
-    for i, features in enumerate(input):
+    for i, features in enumerate(input_data):
 
         data = []
         index = []
@@ -120,6 +121,11 @@ def run(input: List[Features]):
         if features.max_cross:
             data.append(features.max_cross)
             index.append('max_cross')
+
+        if features.secondiff:
+            data.append(features.secondiff)
+            index.append('secondiff')
+
 
         # process features
         _jacc, _leve = process_text_similarities(
@@ -144,24 +150,25 @@ def run(input: List[Features]):
             stats = {
                 'mean': statistics.mean(scores),
                 'median': statistics.median(scores),
-                'stdev': statistics.stdev(scores)
+                'stdev': statistics.stdev(scores),
+                'secondiff': scores[0] - scores[1]
             }
 
-            for i,v in stats.items():
+            assert scores[0] == max(scores)
+            assert scores[1] == max(scores[1:])
+
+            for i_,v in stats.items():
                 data.append(v)
-                index.append(i)
+                index.append(i_)
 
         nil_X.loc[i, index] = pd.Series(data=data, index=index, name=i)
-
     # run the model
     result = {}
-
     if nil_bi_model is not None:
         result['nil_score_bi'] = list(map(lambda x: x[1], nil_bi_model.predict_proba(nil_X[nil_bi_features])))
 
     if nil_model is not None:
         result['nil_score_cross'] = list(map(lambda x: x[1], nil_model.predict_proba(nil_X[nil_features])))
-
     return result
 
 def process_text_similarities(mention=None, title=None, jaccard=None, levenshtein=None):
@@ -237,7 +244,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    print('Loading nil models...')
+    print('Loading nil models...',)
     nil_bi_model, nil_bi_features, nil_model, nil_features = load_nil_models(args)
     print('Loading complete.')
 

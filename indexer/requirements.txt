@@ -22,3 +22,5 @@ psycopg[binary]
 # annoy
 gatenlp
 requests
+pydantic==1.10.9
+packaging

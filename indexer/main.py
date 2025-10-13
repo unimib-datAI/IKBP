@@ -11,6 +11,7 @@ import os
 from gatenlp import Document
 from itertools import repeat
 import requests
+import logging
 # from annoy import AnnoyIndex
 
 class _Index:
@@ -135,6 +136,9 @@ async def reset():
 @app.post('/api/indexer/search/doc')
 # remember `content-type: application/json`
 async def search_from_doc_api(doc: dict = Body(...)):
+    logging.basicConfig(level=logging.DEBUG)
+    logging.info("This is a debug message")
+    print('search_from_doc_api')
     default_top_k = 10
     if doc.get('features', {}).get('top_k'):
         top_k = doc.get('features', {}).get('top_k')
@@ -149,43 +153,47 @@ async def search_from_doc_topk_api(top_k: int, doc: dict = Body(...)):
 def search_from_doc_topk(top_k, doc):
     doc = Document.from_dict(doc)
 
-    annsets_to_link = set([doc.features.get('annsets_to_link', 'entities_merged')])
+    annsets_to_link = set([doc.features.get('annsets_to_link', 'entities_')])
 
     encodings = []
     mentions = []
-    for annset_name in set(doc.annset_names()).intersection(annsets_to_link):
-        # if not annset_name.startswith('entities'):
-        #     # considering only annotation sets of entities
-        #     continue
-        for mention in doc.annset(annset_name):
-            if 'linking' in mention.features and mention.features['linking'].get('skip', False):
-                # DATES should skip = true bcs linking useless
-                continue
-            enc = mention.features['linking']['encoding']
-            encodings.append(enc)
-            mentions.append(mention)
+    try:
+        for annset_name in set(doc.annset_names()).intersection(annsets_to_link):
+            # if not annset_name.startswith('entities'):
+            #     # considering only annotation sets of entities
+            #     continue
+            for mention in doc.annset(annset_name):
+                if 'linking' in mention.features and mention.features['linking'].get('skip', False):
+                    # DATES should skip = true bcs linking useless
+                    continue
+                enc = mention.features['linking']['encoding']
+                encodings.append(enc)
+                mentions.append(mention)
 
-    all_candidates_4_sample_n = search(encodings, top_k)
+        all_candidates_4_sample_n = search(encodings, top_k)
 
-    for mention, cands in zip(mentions, all_candidates_4_sample_n):
-        # dummy is set when postgres is empty
-        if len(cands) == 0 or ('dummy' in cands[0] and cands[0]['dummy'] == 1):
-            mention.features['is_nil'] = True
-        else:
-            top_cand = cands[0]
-            # TODO here for backward compatibility
-            mention.features['linking']['top_candidate'] = top_cand
-            mention.features['linking']['candidates'] = cands
-            #
-            mention.features['title'] = top_cand['title']
-            mention.features['url'] = top_cand['url']
-            mention.features['additional_candidates'] = cands
+        for mention, cands in zip(mentions, all_candidates_4_sample_n):
+            # dummy is set when postgres is empty
+            if len(cands) == 0 or ('dummy' in cands[0] and cands[0]['dummy'] == 1):
+                mention.features['is_nil'] = True
+            else:
+                top_cand = cands[0]
+                # TODO here for backward compatibility
+                mention.features['linking']['top_candidate'] = top_cand
+                mention.features['linking']['candidates'] = cands
+                #
+                mention.features['title'] = top_cand['title']
+                mention.features['url'] = top_cand['url']
+                mention.features['additional_candidates'] = cands
 
-    if not 'pipeline' in doc.features:
-        doc.features['pipeline'] = []
-    doc.features['pipeline'].append('indexer')
+        if not 'pipeline' in doc.features:
+            doc.features['pipeline'] = []
+        doc.features['pipeline'].append('indexer')
 
-    return doc.to_dict()
+        return doc.to_dict()
+    except Exception as e:
+        print('Error in search_from_doc_topk:', e)
+        raise HTTPException(status_code=500, detail="Error in search_from_doc_topk.")
 
 @app.post('/api/indexer/info')
 async def id2info_api(idinput: Idinput):
@@ -506,7 +514,8 @@ if __name__ == '__main__':
     dbconnection = psycopg.connect(args.postgres)
 
     language = args.language
-
+    logging.basicConfig(level=logging.DEBUG)
+    logging.debug("This is a debug message")
     print('Loading indexes...')
     load_models(args)
     print('Loading complete.')

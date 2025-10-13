@@ -1,7 +1,0 @@
-fastDamerauLevenshtein
-fastapi
-uvicorn
-sklearn
-scikit-learn-extra
-pandas
-gatenlp

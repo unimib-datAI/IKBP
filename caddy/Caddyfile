@@ -24,8 +24,11 @@ http:// {
 	handle /api/tintner* {
 		reverse_proxy tintner:80
 	}
-	handle /api/nilcluster* {
-		reverse_proxy nilcluster:80
+	handle /api/clustering* {
+		reverse_proxy clustering:80
+	}
+	handle /api/postprocess* {
+		reverse_proxy postprocess:80
 	}
 	handle /api/pipeline* {
 		reverse_proxy pipeline:80
@@ -36,9 +39,18 @@ http:// {
 	handle /api/mergesets* {
 		reverse_proxy mergener:80
 	}
-	handle_path /api/mongo/* {
+	handle /api/mongo_demo* {
+		reverse_proxy documents_demo:3002
+	}
+	handle_path /api/mongo* {
 		rewrite * /api/{path}
 		reverse_proxy documents:3001
 	}
-	respond "404 Not Found" 404
-}
+	handle /api/consolidation* {
+		reverse_proxy consolidation:80
+	}
+	handle /api/interessati* {
+		reverse_proxy interessati:80
+	}
+	
+

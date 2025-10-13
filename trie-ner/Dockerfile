@@ -12,4 +12,4 @@ COPY . .
 
 RUN pip install --no-cache-dir --upgrade -r /home/app/requirements.txt
 
-CMD python main.py --host 0.0.0.0 --port 80 --path-to-saved-tries "$PATH_TO_SAVED_TRIES" --trie-name "$TRIE_NAME"
+CMD python main.py --host 0.0.0.0 --port 80 --path-to-saved-tries "$PATH_TO_SAVED_TRIES" --trie-name "$TRIE_NAME" --path-to-stopwords "$PATH_TO_STOPWORDS_TRIE"

@@ -95,7 +95,7 @@ def preprocess_annset(doc, annset_exclusion_list, types_list, type_relation_df):
   ordered_myannotation_list = [annotation for annotation in sorted(myannotation_list, key=lambda ann: (ann.start, ann.end, ann.ann_type))]
   return ordered_myannotation_list
 
-
+# TODO riscrivere sfruttando gatenlp
 def analyze_overlap(annotation_set_input):
     annotation_set = annotation_set_input.copy()
     current_element = None
@@ -192,8 +192,17 @@ def check_root_type(ann_list, annset_priority) -> list:
   prevalent root_type does not exist and metadata source does not exist. All
   sources are kept.
   '''
-  root_type_Counter = Counter([x.root_type for x in ann_list])
+
+  # weight the frequencies by the annset priorty
+  root_type_Counter = {}
+  for ann in ann_list:
+    if ann.root_type not in root_type_Counter:
+      root_type_Counter[ann.root_type] = 0
+    root_type_Counter[ann.root_type] += int(annset_priority.get(ann.source, 1))
+  root_type_Counter = Counter(root_type_Counter)
+
   most_frequent_type = root_type_Counter.most_common(1)[0][0]
+
   local_annset_priority = check_annset_priority(ann_list, annset_priority)
   filtered_list = [x for x in ann_list if x.source == local_annset_priority]
   filtered_root_type_Counter = Counter([x.root_type for x in filtered_list])

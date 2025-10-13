@@ -59,30 +59,6 @@ def run(doc, doc_id = None):
             raise Exception('spacyNER error')
         doc = Document.from_dict(res_ner.json())
 
-    if 'tintner' in doc.features['pipeline']:
-        print('Skipping tintner: already done')
-    else:
-        res_ner = requests.post(args.tintner, json=doc.to_dict())
-        if not res_ner.ok:
-            raise Exception('tintNER error')
-        doc = Document.from_dict(res_ner.json())
-
-    if 'triener' in doc.features['pipeline']:
-        print('Skipping triener: already done')
-    else:
-        res_ner = requests.post(args.triener, json=doc.to_dict())
-        if not res_ner.ok:
-            raise Exception('trieNER error')
-        doc = Document.from_dict(res_ner.json())
-
-    if 'mergener' in doc.features['pipeline']:
-        print('Skipping mergener: already done')
-    else:
-        res_ner = requests.post(args.mergener, json=doc.to_dict())
-        if not res_ner.ok:
-            raise Exception('mergeNER error')
-        doc = Document.from_dict(res_ner.json())
-
     if 'biencoder' in doc.features['pipeline']:
         print('Skipping biencoder: already done')
     else:
@@ -124,13 +100,29 @@ def run(doc, doc_id = None):
     #                 annotation._type = annotation.features['linking']['top_candidate']['type_']
     # # TODO ensure consistency between types
 
-    if 'nilclustering' in doc.features['pipeline']:
-        print('Skipping nilclustering: already done')
+    if 'clustering' in doc.features['pipeline']:
+        print('Skipping clustering: already done')
     else:
-        res_clustering = requests.post(args.nilcluster, json=doc.to_dict())
+        res_clustering = requests.post(args.clustering, json=doc.to_dict())
         if not res_clustering.ok:
             raise Exception('Clustering error')
         doc = Document.from_dict(res_clustering.json())
+
+    if 'consolidation' in doc.features['pipeline']:
+        print('Skipping consolidation: already done')
+    else:
+        res_consolidation = requests.post(args.consolidation, json=doc.to_dict())
+        if not res_consolidation.ok:
+            raise Exception('Consolidation error')
+        doc = Document.from_dict(res_consolidation.json())
+
+    if 'interessati' in doc.features['pipeline']:
+        print('Skipping interessati: already done')
+    else:
+        res_interessati = requests.post(args.interessati, json=doc.to_dict())
+        if not res_interessati.ok:
+            raise Exception('Interessati error')
+        doc = Document.from_dict(res_interessati.json())
 
     if doc.features.get('populate', False):
         # get clusters
@@ -212,15 +204,6 @@ if __name__ == '__main__':
         "--api-spacyner", type=str, default=None, help="spacyner URL", dest='spacyner', required=False
     )
     parser.add_argument(
-        "--api-tintner", type=str, default=None, help="tintner URL", dest='tintner', required=False
-    )
-    parser.add_argument(
-        "--api-triener", type=str, default=None, help="triener URL", dest='triener', required=False
-    )
-    parser.add_argument(
-        "--api-mergener", type=str, default=None, help="mergener URL", dest='mergener', required=False
-    )
-    parser.add_argument(
         "--api-biencoder-mention", type=str, default=None, help="biencoder_mention URL", dest='biencoder_mention', required=False
     )
     parser.add_argument(
@@ -242,10 +225,16 @@ if __name__ == '__main__':
         "--api-nilpredictor", type=str, default=None, help="nilpredictor URL", dest='nilpredictor', required=False
     )
     parser.add_argument(
-        "--api-nilcluster", type=str, default=None, help="nilcluster URL", dest='nilcluster', required=False
+        "--api-clustering", type=str, default=None, help="clustering URL", dest='clustering', required=False
     )
     parser.add_argument(
         "--api-mongo", type=str, default=None, help="mongo URL", dest='mongo', required=False
+    )
+    parser.add_argument(
+        "--api-consolidation", type=str, default=None, help="consolidation URL", dest='consolidation', required=False
+    )
+    parser.add_argument(
+        "--api-interessati", type=str, default=None, help="interessati URL", dest='interessati', required=False
     )
 
     args = parser.parse_args()
@@ -254,12 +243,6 @@ if __name__ == '__main__':
         args.sectionator = args.baseurl + '/api/sectionator'
     if args.spacyner is None:
         args.spacyner = args.baseurl + '/api/spacyner'
-    if args.tintner is None:
-        args.tintner = args.baseurl + '/api/tintner'
-    if args.triener is None:
-        args.triener = args.baseurl + '/api/triener'
-    if args.mergener is None:
-        args.mergener = args.baseurl + '/api/mergesets/doc'
     if args.biencoder_mention is None:
         args.biencoder_mention = args.baseurl + '/api/blink/biencoder/mention/doc'
     if args.biencoder_entity is None:
@@ -274,9 +257,13 @@ if __name__ == '__main__':
         args.indexer_reset = args.baseurl + '/api/indexer/reset/rw'
     if args.nilpredictor is None:
         args.nilpredictor = args.baseurl + '/api/nilprediction/doc'
-    if args.nilcluster is None:
-        args.nilcluster = args.baseurl + '/api/nilcluster/doc'
+    if args.clustering is None:
+        args.clustering = args.baseurl + '/api/clustering'
     if args.mongo is None:
         args.mongo = args.baseurl + '/api/mongo'
+    if args.consolidation is None:
+        args.consolidation = args.baseurl + '/api/consolidation'
+    if args.interessati is None:
+        args.interessati = args.baseurl + '/api/interessati/rulebased'
 
     uvicorn.run(app, host = args.host, port = args.port)

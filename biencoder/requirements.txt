@@ -31,3 +31,4 @@ uvicorn
 fastapi
 # supervisor
 gatenlp
+pydantic==1.10.9

@@ -1,16 +1,10 @@
 version: "3"
 services:
-
-  tint:
-    restart: $RESTART_POLICY
-    image: rpozzi/tint
-    # build:
-    #   context: tint
-    #   dockerfile: Dockerfile
-
   postgres:
     restart: $RESTART_POLICY
     image: postgres:14
+    networks:
+      - caddy_net
     environment:
       POSTGRES_PASSWORD: $POSTGRES_PASSWORD
     volumes:
@@ -26,51 +20,65 @@ services:
       MONGO_INITDB_DATABASE: main
       MONGO_INITDB_USERNAME: usr
       MONGO_INITDB_PASSWORD: $MONGO_PASSWORD
+      MONGO: $MONGO
     volumes:
       - ./mongo/data:/data/db
       - ./mongo/initdb.d:/docker-entrypoint-initdb.d/
     ports:
-      - "27017:27017"
+      - 127.0.0.1:27017:27017
+
   documents:
     restart: $RESTART_POLICY
     build: documents
     environment:
-      PORT: 3001
+      DOCS_PORT: 3001
       ENABLE_AUTH: false
-      MONGO: mongodb://usr:$MONGO_PASSWORD@mongo:27017/main
+      MONGO: $MONGO
+    networks:
+      - caddy_net
     volumes:
       - ./documents/src:/app/src
-
-  biencoder:
+    ports:
+      - 3001:3001
+  documents_demo:
     restart: $RESTART_POLICY
-    #image: rpozzi/blink_biencoder
-    build:
-      context: ./biencoder
-      dockerfile: Dockerfile
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-      - ./biencoder/main.py:/home/app/main.py
+    build: documents
     environment:
-      PYTHONPATH: /home/app
-      BIENCODER_MODEL: $BIENCODER_MODEL
-      BIENCODER_CONFIG: $BIENCODER_CONFIG
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [ gpu ]
-    # command: python main.py --host 0.0.0.0 --port 80 --biencoder_model $BIENCODER_MODEL --biencoder_config $BIENCODER_CONFIG
-    # command: sleep 3600
+      DOCS_PORT: 3001
+      ENABLE_AUTH: false
+      MONGO: $MONGO_DOCUMENTS
+    networks:
+      - caddy_net
+    volumes:
+      - ./documents/src:/app/src
+    ports:
+      - 3002:3001
+  documents_sperimentazione:
+    restart: $RESTART_POLICY
+    build: documents
+    environment:
+      DOCS_PORT: 3001
+      ENABLE_AUTH: false
+      MONGO: $MONGO_SPERIMENTAZIONE
+    networks:
+      - caddy_net
+    volumes:
+      - ./documents/src:/app/src
+    ports:
+      - 3003:3001
 
   indexer:
     restart: $RESTART_POLICY
     # image: rpozzi/blink_indexer
     build:
-        context: ./indexer
-        dockerfile: Dockerfile
+      context: ./indexer
+      dockerfile: Dockerfile
+    networks:
+      - caddy_net
     volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - /mnt/data/models:/home/app/models
       - ./indexer/main.py:/home/app/main.py
+
     environment:
       INDEXER_INDEX: $INDEXER_INDEX
       POSTGRES_PASSWORD: $POSTGRES_PASSWORD
@@ -79,83 +87,6 @@ services:
     depends_on:
       - postgres
     # command: python main.py --host 0.0.0.0 --port 80 --index $INDEXER_INDEX --postgres postgres://postgres:$POSTGRES_PASSWORD@postgres:5432/postgres --vector-size $INDEXER_VECTOR_SIZE --language $INDEXER_LANGUAGE
-
-  nilcluster:
-    restart: $RESTART_POLICY
-    #image: rpozzi/blink_nilcluster
-    build:
-        context: ./nilcluster
-        dockerfile: Dockerfile
-    volumes:
-      - ./nilcluster/main.py:/home/app/main.py
-      - ./nilcluster/Packages:/home/app/Packages
-    # command: sleep 7200
-    # command: python main.py --host 0.0.0.0 --port 80
-
-  nilpredictor:
-    restart: $RESTART_POLICY
-    #image: rpozzi/blink_nilpredictor
-    build:
-        context: ./nilpredictor
-        dockerfile: Dockerfile
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-      - ./nilpredictor/main.py:/home/app/main.py
-    environment:
-      NILPREDICTOR_ARGS: $NILPREDICTOR_ARGS
-    # command: python main.py --host 0.0.0.0 --port 80 $NILPREDICTOR_ARGS
-
-  triener:
-    restart: $RESTART_POLICY
-    build:
-        context: ./trie-ner
-        dockerfile: Dockerfile
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-      - ./trie-ner/main.py:/home/app/main.py
-      - ./trie-ner/TrieNER.py:/home/app/TrieNER.py
-    environment:
-      TRIE_NAME: $TRIE_NAME
-      PATH_TO_SAVED_TRIES: $PATH_TO_SAVED_TRIES
-
-  mergener:
-    restart: $RESTART_POLICY
-    build:
-        context: ./merge-annotation-sets
-        dockerfile: Dockerfile
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-      - ./merge-annotation-sets/main.py:/home/app/main.py
-      - ./merge-annotation-sets/build_type_relation_df.py:/home/app/build_type_relation_df.py
-      - ./merge-annotation-sets/merge_sets.py:/home/app/merge_sets.py
-    environment:
-      PATH_TO_TYPES: $MERGE_PATH_TO_TYPES
-      PATH_TO_TYPE_RELATION_CSV: $MERGE_PATH_TO_TYPE_RELATION_CSV
-      PATH_TO_ANNSET_PRIORITY: $MERGE_PATH_TO_ANNSET_PRIORITY
-
-  sectionator:
-    restart: $RESTART_POLICY
-    build:
-      context: ./sectionator
-      dockerfile: Dockerfile
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-      - ./sectionator/main.py:/home/app/main.py
-    environment:
-      DISTRIBUZIONE_TERRITORIALE_UFFICI: $SECTIONATOR_DISTRIBUZIONE_TERRITORIALE_UFFICI
-
-  specialization:
-    restart: $RESTART_POLICY
-    build:
-      context: ./specialization
-      dockerfile: Dockerfile
-    volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
-      - ./specialization/main.py:/home/app/main.py
-      - ./specialization/fakeCandidates.py:/home/app/fakeCandidates.py
-    environment:
-      PIPELINE_ADDRESS: $PIPELINE_ADDRESS
-      # command: sleep 7200
 
   pipeline:
     restart: $RESTART_POLICY
@@ -171,33 +102,179 @@ services:
     environment:
       SPACY_MODEL: $SPACY_MODEL
       SPACY_TAG: $SPACY_TAG
+      SPACY_SENTER: $SPACY_SENTER
+      SPACY_WORKERS: $SPACY_WORKERS
+      SPACY_TIMEOUT: $SPACY_TIMEOUT
+      SPACY_GPU: $SPACY_GPU
     volumes:
-      - ${LOCAL_WORKSPACE_FOLDER}/models:/home/app/models
+      - /mnt/data/models:/home/app/models
       - ./spacyner/main.py:/home/app/main.py
+    networks:
+      - caddy_net
+    ports:
+      - 3222:80
     deploy:
       resources:
         reservations:
           devices:
-            - capabilities: [ gpu ]
-    # command: python __main__.py --host 0.0.0.0 --port 80 --model $SPACY_MODEL --tint http://tint:8012/tint
-
-  tintner:
+            - capabilities: [gpu]
+  biencoder:
     restart: $RESTART_POLICY
-    build: ./tintner
+    build: ./biencoder
+    environment:
+      BIENCODER_MODEL: $BIENCODER_MODEL
+      BIENCODER_CONFIG: $BIENCODER_CONFIG
+    networks:
+      - caddy_net
     volumes:
-      - ./tintner/main.py:/home/app/main.py
-    # command: python __main__.py --host 0.0.0.0 --port 80 --model $SPACY_MODEL --tint http://tint:8012/tint
+      - /mnt/data/models:/home/app/models
+      - ./biencoder/main.py:/home/app/main.py
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    # command: python __main__.py --host 0.0.0.0 --port 80 --model $SPACY_MODEL
+  consolidation:
+    restart: $RESTART_POLICY
+    build: ./consolidation
+    networks:
+      - caddy_net
+    volumes:
+      - /mnt/data/models:/home/app/models
+      - ./consolidation/:/home/app/
 
+  nilpredictor:
+    restart: $RESTART_POLICY
+    build: ./nilpredictor
+    networks:
+      - caddy_net
+    environment:
+      NILPREDICTOR_ARGS: $NILPREDICTOR_ARGS
+    volumes:
+      - /mnt/data/models:/home/app/models
+      - ./nilpredictor/:/home/app/
+  clustering:
+    restart: $RESTART_POLICY
+    build: ./clustering
+    networks:
+      - caddy_net
+    environment:
+      CLUSTERING_MODEL: $CLUSTERING_MODEL
+    volumes:
+      - /mnt/data/models:/home/app/models
+      - ./clustering/:/home/app/
   caddy:
     restart: $RESTART_POLICY
     image: caddy:2
     ports:
-      - "$CADDY_LISTEN_HTTP:80"
+      - "10881:80"
+    networks:
+      - caddy_net
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile
       - ./caddy/site:/srv
       - ./caddy/data:/data
       - ./caddy/config:/config
+  ui_demo:
+    restart: $RESTART_POLICY
+    build:
+      context: giustizia-ui
+      args:
+        ACCESS_USERNAME: $UI_DEMO_ACCESS_USERNAME
+        ACCESS_PASSWORD: $UI_DEMO_ACCESS_PASSWORD
+        API_BASE_URI: ${DEMO_PIPELINE_ADDRESS}/api
+        API_USERNAME: ""
+        API_PASSWORD: ""
+        NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
+        NEXTAUTH_URL: $DEMO_UI_NEXTAUTH_URL
+        NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
+        NEXT_PUBLIC_FULL_PATH: $DEMO_UI_NEXT_PUBLIC_FULL_PATH
+        API_LLM: $UI_API_LLM
+        API_INDEXER: $UI_API_INDEXER
+        VARIANT: "bologna"
+        TEXT_GENERATION: $TEXT_GENERATION_ADDR
+        ELASTIC_INDEX: "bologna"
+    ports:
+      - $DEMO_LISTEN_UI:3000
+      # - 127.0.0.1:9229:9229
+    environment:
+      ACCESS_USERNAME: $UI_DEMO_ACCESS_USERNAME
+      ACCESS_PASSWORD: $UI_DEMO_ACCESS_PASSWORD
+      API_BASE_URI: ${DEMO_PIPELINE_ADDRESS}/api
+      API_USERNAME: ""
+      API_PASSWORD: ""
+      NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
+      NEXTAUTH_URL: $DEMO_UI_NEXTAUTH_URL
+      NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
+      NEXT_PUBLIC_FULL_PATH: $DEMO_UI_NEXT_PUBLIC_FULL_PATH
+      API_LLM: $UI_API_LLM
+      API_INDEXER: $UI_API_INDEXER
+      VARIANT: "bologna"
+      TEXT_GENERATION: $TEXT_GENERATION_ADDR
+      HOST: host.docker.internal
+      ELASTIC_INDEX: "bologna"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    volumes:
+      - ./giustizia-ui/modules:/app/modules
+      - ./giustizia-ui/server:/app/server
+      - ./giustizia-ui/pages:/app/pages
+      - ./giustizia-ui/components:/app/components
+      - ./giustizia-ui/lib:/app/lib
+      - ./giustizia-ui/package.json:/app/package.json
+    # command: sleep 7200
+
+  ui_sperimentazione:
+    restart: $RESTART_POLICY
+    build:
+      context: giustizia-ui
+      args:
+        ACCESS_USERNAME: $UI_DEMO_ACCESS_USERNAME
+        ACCESS_PASSWORD: $UI_DEMO_ACCESS_PASSWORD
+        API_BASE_URI: ${SPERIMENTAZIONE_PIPELINE_ADDRESS}/api
+        API_USERNAME: ""
+        API_PASSWORD: ""
+        NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
+        NEXTAUTH_URL: $SPERIMENTAZIONE_UI_NEXTAUTH_URL
+        NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
+        NEXT_PUBLIC_FULL_PATH: $SPERIMENTAZIONE_UI_NEXT_PUBLIC_FULL_PATH
+        API_LLM: $UI_API_LLM
+        API_INDEXER: $UI_API_INDEXER
+        VARIANT: "sperimentazione"
+        TEXT_GENERATION: $TEXT_GENERATION_ADDR
+        ELASTIC_INDEX: "sperimentazione"
+    ports:
+      - $SPERIMENTAZIONE_LISTEN_UI:3000
+      # - 127.0.0.1:9229:9229
+    environment:
+      ACCESS_USERNAME: $UI_DEMO_ACCESS_USERNAME
+      ACCESS_PASSWORD: $UI_DEMO_ACCESS_PASSWORD
+      API_BASE_URI: ${SPERIMENTAZIONE_PIPELINE_ADDRESS}/api
+      API_USERNAME: ""
+      API_PASSWORD: ""
+      NEXTAUTH_SECRET: $UI_NEXTAUTH_SECRET
+      NEXTAUTH_URL: $DEMO_UI_NEXTAUTH_URL
+      NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
+      NEXT_PUBLIC_FULL_PATH: $DEMO_UI_NEXT_PUBLIC_FULL_PATH
+      API_LLM: $UI_API_LLM
+      API_INDEXER: $UI_API_INDEXER
+      VARIANT: "bologna"
+      TEXT_GENERATION: $TEXT_GENERATION_ADDR
+      HOST: host.docker.internal
+      ELASTIC_INDEX: "sperimentazione"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    volumes:
+      - ./giustizia-ui/modules:/app/modules
+      - ./giustizia-ui/server:/app/server
+      - ./giustizia-ui/pages:/app/pages
+      - ./giustizia-ui/components:/app/components
+      - ./giustizia-ui/lib:/app/lib
+      - ./giustizia-ui/package.json:/app/package.json
+    # command: sleep 7200
 
   ui:
     restart: $RESTART_POLICY
@@ -213,8 +290,14 @@ services:
         NEXTAUTH_URL: $UI_NEXTAUTH_URL
         NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
         NEXT_PUBLIC_FULL_PATH: $UI_NEXT_PUBLIC_FULL_PATH
+        API_LLM: $UI_API_LLM
+        API_INDEXER: $UI_API_INDEXER
+        VARIANT: $UI_VARIANT
+        TEXT_GENERATION: $TEXT_GENERATION_ADDR
+        ELASTIC_INDEX: "batini"
     ports:
       - $LISTEN_UI:3000
+      - 127.0.0.1:9229:9229
     environment:
       ACCESS_USERNAME: $UI_ACCESS_USERNAME
       ACCESS_PASSWORD: $UI_ACCESS_PASSWORD
@@ -225,3 +308,205 @@ services:
       NEXTAUTH_URL: $UI_NEXTAUTH_URL
       NEXT_PUBLIC_BASE_PATH: $UI_NEXT_PUBLIC_BASE_PATH
       NEXT_PUBLIC_FULL_PATH: $UI_NEXT_PUBLIC_FULL_PATH
+      API_LLM: $UI_API_LLM
+      API_INDEXER: $UI_API_INDEXER
+      VARIANT: $UI_VARIANT
+      TEXT_GENERATION: $TEXT_GENERATION_ADDR
+      HOST: host.docker.internal
+      ELASTIC_INDEX: "batini"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    volumes:
+      - ./giustizia-ui/modules:/app/modules
+      - ./giustizia-ui/server:/app/server
+      - ./giustizia-ui/pages:/app/pages
+      - ./giustizia-ui/components:/app/components
+      - ./giustizia-ui/lib:/app/lib
+      - ./giustizia-ui/package.json:/app/package.json
+    # command: sleep 7200
+
+  text-generation:
+    build:
+      context: ./text-generation
+      dockerfile: Dockerfile
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           capabilities: [ gpu ]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      # - MODEL_NAME=${TEXT_GENERATION_MODEL}
+      - GPU_LAYERS=${TEXT_GENERATION_GPU_LAYERS}
+    ports:
+      - 10.0.0.108:7862:7862
+      - 8000:8000
+    volumes:
+      - ./models/text-generation:/workspace/models
+      - /mnt/data:/models
+      # - ./text-generation/src:/workspace
+  lmstudio:
+    build: .
+    container_name: lmstudio
+    ports:
+      - "1234:1234"
+      - "5900:5900"
+    volumes:
+      - /mnt/data/models:/root/.cache/lm-studio/models
+    environment:
+      - CONTEXT_LENGTH=32768
+      - MODEL_PATH=bartowski/Codestral-22B-v0.1-GGUF/Codestral-22B-v0.1-Q8_0.gguf
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    command: ["/start_services.sh"]
+    restart: always
+  openllm:
+    image: openllm/openllm:latest
+    environment:
+      - MODEL_PATH=/mnt/data/models/Phi-3.5-mini-ITA.Q8_0.gguf
+      - QUANTIZE=ggml
+      - DEVICE=cuda
+    ports:
+      - "3000:3000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]
+              capabilities: [gpu]
+
+  # llama_server:
+  #   restart: $RESTART_POLICY
+  #   build:
+  #     context: ./llama_server
+  #     dockerfile: Dockerfile
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+  #   environment:
+  #     - MODEL_PATH=/models/llama-2-7b.gguf
+  #     - SERVER_PORT=8080
+  #     - GPU_LAYERS=35
+  #     - THREADS=8
+  #     - BATCH_SIZE=512
+  #   volumes:
+  #     - ./models:/models
+  #   networks:
+  #     - caddy_net
+  #   ports:
+  #     - 8080:8080
+  llama_server:
+    image: dongxiaoman/llama.cpp-server:cuda-latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./models:/models
+    environment:
+      - MODEL_PATH=/models/your_model_file
+      - CUDA_VISIBLE_DEVICES=0 # Adjust based on your GPU
+    command: >
+      -m /models/your_model_file
+      --port 8080
+      --host 0.0.0.0
+      --n_gpu_layers 32  # Adjust based on your GPU memory
+  # llamacpp-server:
+  #   image: ghcr.io/ggerganov/llama.cpp:server-cuda
+  #   ports:
+  #     - 8080:8080
+  #   volumes:
+  #     - ./models:/models
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+  #   environment:
+  #     # alternatively, you can use "LLAMA_ARG_MODEL_URL" to download the model
+  #     LLAMA_ARG_MODEL: /models/Phi-3.5-mini-ITA.Q8_0.gguf
+  #     # LLAMA_ARG_CTX_SIZE: 4096
+  #     LLAMA_ARG_N_PARALLEL: 2
+  #     LLAMA_ARG_ENDPOINT_METRICS: 1
+  #     LLAMA_ARG_PORT: 8080
+  #     LLAMA_ARG_SPLIT_MODE: none
+
+  es:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.3
+    restart: $RESTART_POLICY
+    environment:
+      - xpack.security.enabled=false
+      ### Avoid test failures due to small disks. NOT SUITABLE FOR PRODUCTION.
+      - cluster.routing.allocation.disk.threshold_enabled=false
+      - cluster.routing.allocation.disk.watermark.low=3mb
+      - cluster.routing.allocation.disk.watermark.high=2mb
+      - cluster.routing.allocation.disk.watermark.flood_stage=1mb
+      - cluster.info.update.interval=1m
+      ###
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms4096m -Xmx4096m
+      - http.max_content_length=200mb
+    networks:
+      - caddy_net
+    ports:
+      - 9201:9200
+    volumes:
+      - ./elasticsearch/data:/usr/share/elasticsearch/data
+
+  qavectorizer:
+    build:
+      context: ./qavectorizer
+      dockerfile: Dockerfile
+    depends_on:
+      - es
+    restart: $RESTART_POLICY
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           capabilities: [ gpu ]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - HOST_BASE_URL=${HOST_BASE_URL}
+      - INDEXER_SERVER_PORT=7863
+      - DOCS_PORT=${DOCS_PORT}
+      - CHROMA_PORT=${CHROMA_PORT}
+      - ELASTIC_PORT=${ELASTIC_PORT}
+      - SENTENCE_TRANSFORMER_EMBEDDING_MODEL=${SENTENCE_TRANSFORMER_EMBEDDING_MODEL}
+      - SENTENCE_TRANSFORMER_DEVICE=${SENTENCE_TRANSFORMER_DEVICE}
+      - OGG2NAME_INDEX=${OGG2NAME_INDEX}
+      - NVIDIA_VISIBLE_DEVICES=all
+    ports:
+      - ${QAVECTORIZER_ADDR}:7863
+    networks:
+      - caddy_net
+    volumes:
+      - ./qavectorizer/src:/workspace
+      - ./models:/root/models
+      - ./models/qavectorizer:/root/.cache/huggingface
+networks:
+  caddy_net:
+    driver: bridge
