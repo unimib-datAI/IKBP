@@ -10,3 +10,5 @@ elasticsearch/data
 .swp
 __pycache__
 chroma-volumes
+corpus_annotated
+corpus_store
