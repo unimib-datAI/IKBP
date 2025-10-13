@@ -1,0 +1,12 @@
+nohup: ignoring input
+{"level":"info","ts":1731594536.7777472,"msg":"using config from file","file":"./caddy/Caddyfile"}
+{"level":"info","ts":1731594536.77991,"msg":"adapted config to JSON","adapter":"caddyfile"}
+{"level":"warn","ts":1731594536.7799468,"msg":"Caddyfile input is not formatted; run 'caddy fmt --overwrite' to fix inconsistencies","adapter":"caddyfile","file":"./caddy/Caddyfile","line":2}
+{"level":"info","ts":1731594536.7814603,"logger":"admin","msg":"admin endpoint started","address":"localhost:2019","enforce_origin":false,"origins":["//localhost:2019","//[::1]:2019","//127.0.0.1:2019"]}
+{"level":"info","ts":1731594536.781673,"logger":"http.auto_https","msg":"automatic HTTPS is completely disabled for server","server_name":"srv0"}
+{"level":"info","ts":1731594536.7817004,"logger":"tls.cache.maintenance","msg":"started background certificate maintenance","cache":"0xc0001d8380"}
+{"level":"info","ts":1731594536.7822714,"logger":"http.log","msg":"server running","name":"srv0","protocols":["h1","h2","h3"]}
+{"level":"info","ts":1731594536.7823973,"msg":"autosaved config (load with --resume flag)","file":"/root/.config/caddy/autosave.json"}
+{"level":"info","ts":1731594536.7824042,"msg":"serving initial configuration"}
+{"level":"info","ts":1731594536.7834992,"logger":"tls","msg":"storage cleaning happened too recently; skipping for now","storage":"FileStorage:/root/.local/share/caddy","instance":"c74ff538-4f5a-4748-b469-f507107996ac","try_again":1731680936.7834969,"try_again_in":86399.999999209}
+{"level":"info","ts":1731594536.7835689,"logger":"tls","msg":"finished cleaning storage units"}
