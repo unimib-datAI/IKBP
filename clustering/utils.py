@@ -46,12 +46,12 @@ def sourface_similarity(text_a, text_b):
              subsequence.normalized_similarity(text_a, text_b)]
     return score
 
-def compute_similarity(idx_a, idx_b, text_a, text_b, matr_embd, decimal='', uncased=True):
+def compute_similarity(array_idx_a, array_idx_b, text_a, text_b, matr_embd, decimal='', uncased=True):
     if uncased:
         text_a = text_a.lower()
         text_b = text_b.lower()
-    embd_a = matr_embd[idx_a]
-    embd_b = matr_embd[idx_b]
+    embd_a = matr_embd[array_idx_a]
+    embd_b = matr_embd[array_idx_b]
     score = sourface_similarity(text_a, text_b) + [cosine_similarity(embd_a, embd_b)]
     if decimal:
         score = [round(s, decimal) for s in score]
@@ -60,15 +60,51 @@ def compute_similarity(idx_a, idx_b, text_a, text_b, matr_embd, decimal='', unca
 def make_clusters(doc_dict, model, annset_name='entities_', threshold=0.64, seed=11, separate_annset=False):
     doc = Document.from_dict(doc_dict)
     annset = doc.annset(annset_name)
-    matr_embd = np.array([vector_decode(ann.features['linking']['encoding']) for ann in annset])
-    annset_ids = [a.id for a in annset]
+    
+    # Filter annotations that have linking encodings
+    valid_annotations = []
+    for ann in annset:
+        if ('linking' in ann.features and 
+            'encoding' in ann.features['linking']):
+            valid_annotations.append(ann)
+    
+    if not valid_annotations:
+        # If no annotations have encodings, return the document unchanged
+        print(f"Warning: No annotations with linking encodings found in annotation set '{annset_name}'")
+        return doc
+    
+    if len(valid_annotations) < 2:
+        # If we have less than 2 annotations, no clustering can be performed
+        print(f"Warning: Only {len(valid_annotations)} annotation(s) with encodings found. Need at least 2 for clustering.")
+        # Still add cluster info for the single annotation if it exists
+        if len(valid_annotations) == 1:
+            ann = valid_annotations[0]
+            ann.features['cluster'] = 0
+            doc.features['clusters'] = {}
+            clusters_info = [{
+                'title': doc.text[ann.start:ann.end].replace('\n',' '),
+                'id': 0,
+                'type': ann.type,
+                'mentions': [{'id': ann.id, 'mention': doc.text[ann.start:ann.end].replace('\n',' ')}]
+            }]
+            doc.features['clusters'][annset_name] = clusters_info
+        return doc
+    
+    # Process only annotations with valid encodings
+    matr_embd = np.array([vector_decode(ann.features['linking']['encoding']) for ann in valid_annotations])
+    annset_ids = [a.id for a in valid_annotations]
+    # Create mapping from annotation ID to array index
+    id_to_idx = {ann_id: idx for idx, ann_id in enumerate(annset_ids)}
     pairs = np.array(list(itertools.combinations(annset_ids, 2)))
     # compute similarity
     X_test=[]
     for idx_a, idx_b in pairs:
         text_a = doc.text[annset[idx_a].start:annset[idx_a].end]
         text_b = doc.text[annset[idx_b].start:annset[idx_b].end]
-        X_test.append(compute_similarity(idx_a, idx_b, text_a, text_b, matr_embd, 5, uncased=True))
+        # Use the mapping to get the correct array indices
+        array_idx_a = id_to_idx[idx_a]
+        array_idx_b = id_to_idx[idx_b]
+        X_test.append(compute_similarity(array_idx_a, array_idx_b, text_a, text_b, matr_embd, 5, uncased=True))
     X_test = np.array(X_test)
     # compute probabilities
     proba = model.predict_proba(X_test)
@@ -99,9 +135,16 @@ def make_clusters(doc_dict, model, annset_name='entities_', threshold=0.64, seed
     cluster2id = {}
     ann_in_cluster = []
     for c_idx, cluster in enumerate(clusters_refine):
-        cluster2id[c_idx] = cluster
-        ann_in_cluster.extend(cluster)
-    clust_id = max(cluster2id.keys()) + 1
+        if cluster:  # Only add non-empty clusters
+            cluster2id[c_idx] = cluster
+            ann_in_cluster.extend(cluster)
+    
+    # Handle annotations not in any cluster
+    if cluster2id:
+        clust_id = max(cluster2id.keys()) + 1
+    else:
+        clust_id = 0
+        
     for ann_id in annset_ids:
         if ann_id not in ann_in_cluster:
             cluster2id[int(clust_id)] = [int(ann_id)]
@@ -119,11 +162,13 @@ def make_clusters(doc_dict, model, annset_name='entities_', threshold=0.64, seed
         except:
             pass
         newset = doc.annset('enitites_clustered')
-        for ann in annset:
-            newset.add(ann.start, ann.end, f'CLUST-{id2cluster[ann.id]}')
+        for ann in valid_annotations:
+            if ann.id in id2cluster:
+                newset.add(ann.start, ann.end, f'CLUST-{id2cluster[ann.id]}')
     else:
-        for ann in annset:
-            annset[ann.id].features['cluster'] = id2cluster[ann.id]
+        for ann in valid_annotations:
+            if ann.id in id2cluster:
+                annset[ann.id].features['cluster'] = id2cluster[ann.id]
 
     doc.features['clusters'] = {}
     clusters_info = []
