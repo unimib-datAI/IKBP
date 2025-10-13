@@ -1,3 +1,4 @@
+import re
 from elasticsearch import Elasticsearch
 import uvicorn
 from pydantic import BaseModel
@@ -65,6 +66,11 @@ class QueryCollectionRquest(BaseModel):
     where: dict = None
     include: List[str] = ["metadatas", "documents", "distances"]
     retrievalMethod: str = "full"
+    force_rag: bool = False
+
+
+class GetElasticMappingRequest(BaseModel):
+    index_name: str
 
 
 class CustomJSONResponse(JSONResponse):
@@ -84,7 +90,6 @@ class CustomJSONResponse(JSONResponse):
     "/chroma/collection/{collection_name}/query", response_class=CustomJSONResponse
 )
 async def query_collection(collection_name: str, req: QueryCollectionRquest):
-
     embeddings = []
     print("query", req.dict())
     with torch.no_grad():
@@ -301,8 +306,6 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
     ):
         print("response_full_text", response_full_text)
     del embeddings
-    print("query", query_body)
-    print("text query", q)
 
     # Get chunk-level ranks for both searches
     vector_ranks = collect_chunk_ranks(results) if len(results) > 0 else {}
@@ -311,7 +314,6 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
         if len(response_full_text) > 0
         else {}
     )
-    print("FT Ranks", full_text_ranks, len(response_full_text))
 
     # RRF Parameters
     rrf_k = 60  # Adjust as needed
@@ -329,7 +331,6 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
 
     # Sort chunks by combined RRF scores
     final_ranking = sorted(combined_scores.items(), key=lambda x: x[1], reverse=True)
-    print("final_ranking", final_ranking)
     # for rank, (doc_id, score) in enumerate(final_ranking[:20], start=1):
     #     print(f"Rank: {rank}, Doc ID: {doc_id}, RRF Score: {score}")
 
@@ -351,16 +352,9 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
     # get full documents from db
     doc_ids = list(doc_chunks_id_map.keys())
     current_retriever = retriever
-    if collection_name == "bologna_clean_renzo":
+    # workaround for current retrieve, need a better way
+    if collection_name == "bologna_renzo_matched":
         current_retriever = retriever_bologna
-    elif collection_name == "sperimentazione":
-        current_retriever = retriever_sperimentazione
-    elif collection_name == "indagini":
-        current_retriever = retriever_indagini
-    elif collection_name == "mirko":
-        current_retriever = retriever_mirko
-    elif collection_name == "doc_eng":
-        current_retriever = retriever_renzo
     for doc_id in doc_ids:
         d = current_retriever.retrieve(doc_id)
         # d = requests.get(
@@ -377,7 +371,6 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
         full_docs.append(d)
 
     doc_results = []
-    print(doc_chunks_id_map.keys())
     full_docs_keywords = [
         "estrai",
         "riassumi",
@@ -388,12 +381,22 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
         if any(keyword in req.query.lower() for keyword in full_docs_keywords)
         else False
     )
+
+    # If force_rag is True, skip all full document checks and always return chunks
+    if req.force_rag:
+        print("FORCE RAG ENABLED")
+        for doc in full_docs:
+            doc_results.append(
+                {"doc": doc, "chunks": doc_chunks_id_map[doc["id"]], "full_docs": False}
+            )
+        return doc_results
+
+    # Otherwise, continue with regular logic for single document case
     if len(req.filter_ids) == 1:
         tokens = tokenizer.tokenize(full_docs[0]["text"])
 
         print(f"Number of tokens: {len(tokens)}")
         if len(tokens) < 18000:
-
             temp_chunk = {
                 "id": full_docs[0]["id"],
                 "text": full_docs[0]["text"],
@@ -404,11 +407,14 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
             }
             doc_results.append(
                 {
+                    "full_docs": True,
                     "doc": full_docs[0],
                     "chunks": [temp_chunk],
                 }
             )
             return doc_results
+
+    # Regular logic for full_docs_flag
     if full_docs_flag:
         token_count = 0
         for doc in full_docs:
@@ -426,6 +432,7 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
                 }
                 doc_results.append(
                     {
+                        "full_docs": True,
                         "doc": doc,
                         "chunks": [temp_chunk],
                     }
@@ -433,15 +440,20 @@ async def query_collection(collection_name: str, req: QueryCollectionRquest):
             return doc_results
         else:
             for doc in full_docs:
-                print(doc)
-                print(doc.keys())
-                doc_results.append({"doc": doc, "chunks": doc_chunks_id_map[doc["id"]]})
+                doc_results.append(
+                    {
+                        "doc": doc,
+                        "chunks": doc_chunks_id_map[doc["id"]],
+                        "full_docs": False,
+                    }
+                )
             return doc_results
 
+    # Default case - return chunked documents
     for doc in full_docs:
-        print(doc)
-        print(doc.keys())
-        doc_results.append({"doc": doc, "chunks": doc_chunks_id_map[doc["id"]]})
+        doc_results.append(
+            {"doc": doc, "chunks": doc_chunks_id_map[doc["id"]], "full_docs": False}
+        )
 
     return doc_results
 
@@ -500,6 +512,10 @@ class IndexElasticDocumentRequest(BaseModel):
     doc: dict
 
 
+class AddAnnotationsRequest(BaseModel):
+    mentions: List[dict]
+
+
 def index_elastic_document_raw(doc, index_name):
     res = es_client.index(index=index_name, document=doc)
     es_client.indices.refresh(index=index_name)
@@ -524,12 +540,86 @@ def tipodoc2name(tipo):
 
 
 def anonymize(s, s_type="persona", anonymize_type=["persona"]):
+    if not s:
+        return ""
     if s_type in anonymize_type:
         words = s.split()
         new_words = ["".join([word[0]] + ["*" * (len(word) - 1)]) for word in words]
         return " ".join(new_words)
     else:
         return s
+
+
+@app.post("/elastic/index/{index_name}/doc/{document_id}/annotations")
+def add_annotations_to_document(
+    index_name: str, document_id: str, req: AddAnnotationsRequest
+):
+    try:
+        print("annotations requests", req)
+        # First get the document
+        doc_query = {
+            "query": {
+                "bool": {
+                    "should": [
+                        {"term": {"id": document_id}},
+                        {"term": {"mongo_id": document_id}},
+                    ]
+                }
+            }
+        }
+
+        search_result = es_client.search(index=index_name, body=doc_query)
+
+        if search_result["hits"]["total"]["value"] == 0:
+            raise HTTPException(
+                status_code=404, detail=f"Document with ID {document_id} not found"
+            )
+
+        # Get the document ID in Elasticsearch
+        es_doc_id = search_result["hits"]["hits"][0]["_id"]
+
+        # Create the complete annotations array directly from the request
+        annotations = []
+        for mention in req.mentions:
+            annotation = {
+                "id": mention.get("id"),
+                "id_ER": mention.get("id_ER", ""),
+                "start": mention.get("start", 0),
+                "end": mention.get("end", 0),
+                "type": mention.get("type", "unknown"),
+                "mention": mention.get("mention", ""),
+                "is_linked": mention.get("is_linked", False),
+                "display_name": mention.get(
+                    "display_name",
+                    anonymize(mention.get("mention", ""))
+                    if mention.get("type") in ["persona", "parte", "controparte"]
+                    else mention.get("mention", ""),
+                ),
+                "anonymize": mention.get("type") in ["persona", "parte", "controparte"],
+            }
+            annotations.append(annotation)
+
+        # Direct update of the entire annotations array in a single operation
+        result = es_client.update(
+            index=index_name,
+            id=es_doc_id,
+            body={"doc": {"annotations": annotations}},
+            refresh=True,
+        )
+
+        return {
+            "result": result["result"],
+            "document_id": document_id,
+            "annotations_count": len(annotations),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error updating annotations: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error updating annotations: {str(e)}"
+        )
 
 
 @app.post("/elastic/index/{index_name}/doc/mongo")
@@ -645,7 +735,7 @@ async def query_elastic_index(
     search_res = es_client.search(
         index=index_name,
         size=20,
-        source_excludes=["chunks"],
+        source_excludes=["chunks", "annotation_sets"],
         from_=from_offset,
         query=query,
     )
@@ -671,6 +761,16 @@ async def query_elastic_index(
             "total_hits": total_hits,
         },
     }
+
+
+@app.get("/elastic/index/{index_name}/mapping")
+def get_elastic_mapping(index_name: str):
+    """Get the Elasticsearch mapping for an index to help diagnose type issues."""
+    try:
+        mapping = es_client.indices.get_mapping(index=index_name)
+        return mapping
+    except Exception as e:
+        return {"error": str(e)}
 
 
 if __name__ == "__main__":
@@ -717,22 +817,10 @@ if __name__ == "__main__":
         # },
     )
 
-    DOCS_BASE_URL = "http://" + "documents" + ":" + "3001"
     # for bologna  "http://" + "10.0.0.108" + ":" + "3002"
-    BOLOGNA_DOCS_BASE_URL = "http://" + "10.0.0.108" + ":" + "3002"
-    SPERIMENTAZIONE_DOCS_BASE_URL = "http://" + "10.0.0.108" + ":" + "3003"
-    INDAGINI_DOCS_BASE_URL = "http://" + "10.0.0.108" + ":" + "3004"
-    MIRKO_DOCS_BASE_URL = "http://" + "10.0.0.108" + ":" + "3005"
-    RENZO_DOCS_BASE_URL = "http://" + "10.0.0.108" + ":" + "3006"
-    print(DOCS_BASE_URL)
-    retriever = DocumentRetriever(url=DOCS_BASE_URL + "/api/document")
+    BOLOGNA_DOCS_BASE_URL = "http://" + "localhost" + ":" + "3002"
+
     retriever_bologna = DocumentRetriever(url=BOLOGNA_DOCS_BASE_URL + "/api/document")
-    retriever_sperimentazione = DocumentRetriever(
-        url=SPERIMENTAZIONE_DOCS_BASE_URL + "/api/document"
-    )
-    retriever_indagini = DocumentRetriever(url=INDAGINI_DOCS_BASE_URL + "/api/document")
-    retriever_mirko = DocumentRetriever(url=MIRKO_DOCS_BASE_URL + "/api/document")
-    retriever_renzo = DocumentRetriever(url=RENZO_DOCS_BASE_URL + "/api/document")
     # if not os.getenv("ENVIRONMENT", "production") == "dev":
     #     with open(environ.get("OGG2NAME_INDEX"), "r") as fd:
     #         ogg2name_index = json.load(fd)

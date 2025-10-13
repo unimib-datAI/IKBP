@@ -135,3 +135,37 @@ def query_elastic_index(index_name, options):
         return r.json()
     except HTTPError as e:
         print(e)
+
+
+def add_annotations_to_document(index_name, document_id, mentions):
+    """
+    Add or remove annotations to/from a document in Elasticsearch.
+
+    Args:
+        index_name (str): The name of the Elasticsearch index
+        document_id (str): The ID of the document to update
+        mentions (list): A list of mention objects to add as annotations.
+                         Each mention can include a "to_delete" boolean flag
+                         to indicate if it should be removed instead of added.
+
+    Returns:
+        dict: The response from the API containing:
+            - result: The Elasticsearch operation result
+            - document_id: The ID of the updated document
+            - annotations_added: Number of annotations added
+            - annotations_removed: Number of annotations removed
+    """
+    try:
+        r = requests.post(
+            INDEXER_BASE_URL
+            + "/elastic/index/{index_name}/doc/{document_id}/annotations".replace(
+                "{index_name}", index_name
+            ).replace(
+                "{document_id}", document_id
+            ),
+            json={"mentions": mentions},
+        )
+        return r.json()
+    except HTTPError as e:
+        print(e)
+        return {"error": str(e)}
